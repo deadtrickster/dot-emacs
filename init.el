@@ -13,7 +13,8 @@
  '(inhibit-startup-echo-area-message "dead")
  '(inhibit-startup-screen t)
  '(package-selected-packages
-   (quote (iedit alchemist web-mode rainbow-mode erlang ac-slime js2-refactor js2-mode paredit paren-face auto-complete go-autocomplete go-eldoc yasnippet flycheck go-mode highlight-numbers hl-todo)))
+   (quote
+    (flycheck-elixir flycheck-mix less-css-mode sass-mode scss-mode ac-php php-mode iedit alchemist web-mode rainbow-mode erlang ac-slime js2-refactor js2-mode paredit paren-face auto-complete go-autocomplete go-eldoc yasnippet flycheck go-mode highlight-numbers hl-todo)))
  '(tool-bar-mode nil))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
