@@ -1,8 +1,11 @@
+(require 'mode-ac)
 (require 'mode-web-mode)
+(require 'mode-js2)
 (require 'mode-paren)
 (require 'mode-ido)
 (require 'mode-slime)
 (require 'mode-flyspell)
 (require 'mode-rainbow)
+(require 'mode-diff-hl)
 
 (provide 'settings-modes)

@@ -3,9 +3,6 @@
 (add-hook 'prog-mode-hook 'highlight-numbers-mode)
 (add-hook 'prog-mode-hook 'hl-todo-mode)
 
-(require 'auto-complete-config)
-(ac-config-default)
-
 (global-flycheck-mode)
 
 (yas-global-mode 1)
