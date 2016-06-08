@@ -2,5 +2,6 @@
 (require 'lang-js)
 (require 'lang-erlang)
 (require 'lang-css)
+(require 'lang-cl)
 
 (provide 'settings-langs)

@@ -6,7 +6,7 @@
 (require 'settings-indent)
 (require 'settings-keys)
 
-(require 'settings-langs)
 (require 'settings-modes)
+(require 'settings-langs)
 
 (provide 'settings)

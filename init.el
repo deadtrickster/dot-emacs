@@ -14,7 +14,7 @@
  '(inhibit-startup-screen t)
  '(package-selected-packages
    (quote
-    (smart-mode-line smart-mode-line-powerline-theme diff-hl json-mode flycheck-elixir flycheck-mix less-css-mode sass-mode scss-mode php-mode iedit alchemist web-mode rainbow-mode erlang ac-slime js2-refactor js2-mode paredit paren-face auto-complete go-autocomplete go-eldoc yasnippet flycheck go-mode highlight-numbers hl-todo)))
+    (powerline diff-hl json-mode flycheck-elixir flycheck-mix less-css-mode sass-mode scss-mode php-mode iedit alchemist web-mode rainbow-mode erlang ac-slime js2-refactor js2-mode paredit paren-face auto-complete go-autocomplete go-eldoc yasnippet flycheck go-mode highlight-numbers hl-todo)))
  '(powerline-default-separator (quote wave))
  '(tool-bar-mode nil))
 (custom-set-faces
@@ -31,5 +31,6 @@
 (load "~/.emacs.d/paths.el")
 
 (require 'settings)
+
 (server-start)
 
