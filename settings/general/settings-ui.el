@@ -8,6 +8,7 @@
 
 (require 'smooth-scroll)
 (setf smooth-scroll-mode t)
+(powerline-default-theme)
 
 (provide 'settings-ui)
 

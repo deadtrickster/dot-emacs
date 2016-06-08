@@ -2,9 +2,12 @@
 (require 'mode-web-mode)
 (require 'mode-js2)
 (require 'mode-paren)
+(require 'mode-paredit)
+(require 'mode-paren-face)
 (require 'mode-ido)
 (require 'mode-slime)
 (require 'mode-flyspell)
+(require 'mode-flycheck)
 (require 'mode-rainbow)
 (require 'mode-diff-hl)
 
