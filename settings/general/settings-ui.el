@@ -27,7 +27,8 @@
                                                            (powerline-current-separator)
                                                            (cdr powerline-default-separator-dir))))
                           (lhs
-                           (list (powerline-raw "%4l" mode-line 'l)
+                           (list (powerline-raw mode-line-modified mode-line 'l)
+				 (powerline-raw "%4l" mode-line 'l)
                                  (powerline-raw ": " mode-line 'l)
                                  (powerline-raw "%3c" mode-line 'r)
                                  (powerline-raw " " mode-line)

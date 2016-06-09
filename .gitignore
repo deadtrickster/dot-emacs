@@ -2,6 +2,7 @@
 /elpa/
 *.elc
 *~
+.\#*
 ac-*
 ido*
 autoloads.el
