@@ -10,5 +10,6 @@
 (require 'mode-flycheck)
 (require 'mode-rainbow)
 (require 'mode-diff-hl)
+(require 'mode-iedit)
 
 (provide 'settings-modes)

@@ -9,4 +9,5 @@
 (require 'settings-modes)
 (require 'settings-langs)
 
+(require 'settings-reloading)
 (provide 'settings)

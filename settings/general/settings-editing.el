@@ -5,9 +5,6 @@
 
 (yas-global-mode 1)
 
-(require 'iedit)
-(setf iedit-mode t)
-
 (defun my-turn-off-some-parens ()
   "Turn on brackets and braces as paren characters."
   (interactive)
