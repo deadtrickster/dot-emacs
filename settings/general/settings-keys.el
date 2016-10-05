@@ -33,7 +33,7 @@
          (line-number-at-pos (point))))
     (if (eql current-line 1)
         (progn
-          (beginning-of-line 1)
+          (beginning-of-line )1
           (newline-and-indent)
           (goto-line 1)
           (indent-according-to-mode))

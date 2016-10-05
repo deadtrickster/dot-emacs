@@ -1,8 +1,9 @@
-(setq erlang-mode-hook
+(setq elixir-mode-hook
       (function (lambda ()
                   (setq indent-tabs-mode nil)
+		  (alchemist-mode)
+		  (company-mode)
+		  (flycheck-credo-setup)
 		  (local-set-key (kbd "RET") 'newline-and-indent))))
 
-(setq  erlang-indent-level 2)
-
-(provide 'lang-erlang)
+(provide 'lang-elixir)
