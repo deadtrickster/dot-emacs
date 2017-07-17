@@ -1,5 +1,5 @@
 
-(load (expand-file-name "~/quicklisp/slime-helper.el"))
+;;(load (expand-file-name "~/quicklisp/slime-helper.el"))
 
 (add-hook 'slime-mode-hook
           (lambda ()

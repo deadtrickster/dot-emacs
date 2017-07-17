@@ -1,6 +1,8 @@
 (require 'mode-ac)
 (require 'mode-web-mode)
 (require 'mode-js2)
+(require 'mode-erlang)
+(require 'mode-elixir)
 (require 'mode-paren)
 (require 'mode-paredit)
 (require 'mode-paren-face)

@@ -10,28 +10,90 @@
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
+ '(auto-insert-mode t)
  '(auto-revert-interval 1)
  '(auto-revert-use-notify t)
+ '(display-line-numbers t)
+ '(display-line-numbers-width 3)
+ '(doc-view-continuous t)
+ '(erlang-argument-indent 2)
+ '(erlang-icr-indent nil)
+ '(hscroll-margin 1)
+ '(hscroll-step 1)
  '(inhibit-startup-echo-area-message "dead")
  '(inhibit-startup-screen t)
  '(package-selected-packages
    (quote
-    (flycheck-elixir flycheck-credo fill-column-indicator magit markdown-mode markdown-mode+ markdown-preview-mode markdown-toc yaml-mode elixir-yasnippets lfe-mode alchemist auctex flycheck-protobuf protobuf-mode ac-alchemist iedit ac-php ac-js2 powerline diff-hl json-mode flycheck-mix less-css-mode sass-mode scss-mode php-mode iedit alchemist web-mode rainbow-mode erlang ac-slime js2-refactor js2-mode paredit paren-face auto-complete go-autocomplete go-eldoc yasnippet flycheck go-mode highlight-numbers hl-todo)))
+    (xterm-color magithub copy-as-format git-timemachine git-link scroll-restore counsel ivy company-erlang counsel-projectile projectile projectile-variable yatemplate ivy-erlang-complete dockerfile-mode ag company-nixos-options nix-buffer nix-mode nix-sandbox nixos-options flycheck-elixir flycheck-credo fill-column-indicator magit markdown-mode markdown-mode+ markdown-preview-mode markdown-toc yaml-mode elixir-yasnippets lfe-mode alchemist auctex flycheck-protobuf protobuf-mode ac-alchemist iedit ac-php ac-js2 powerline diff-hl json-mode flycheck-mix less-css-mode sass-mode scss-mode php-mode iedit alchemist web-mode rainbow-mode erlang ac-slime js2-refactor paredit paren-face auto-complete go-autocomplete go-eldoc yasnippet flycheck go-mode highlight-numbers hl-todo)))
  '(powerline-default-separator (quote wave))
- '(tool-bar-mode nil))
+ '(projectile-mode t nil (projectile))
+ '(send-mail-function (quote smtpmail-send-it))
+ '(temporary-file-directory "/mnt/ramdisk")
+ '(tool-bar-mode nil)
+ '(truncate-lines t))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
- '(default ((t (:family "Roboto Mono" :foundry "unknown" :slant normal :weight normal :height 113 :width normal))))
+ '(default ((t (:inherit nil :stipple nil :background "#181a26" :foreground "gray80" :inverse-video nil :box nil :strike-through nil :overline nil :underline nil :slant normal :weight bold :height 114 :width normal :foundry "pyrs" :family "Roboto Mono"))))
  '(js2-object-property ((t (:inherit default :foreground "goldenrod"))))
+ '(line-number ((t (:inherit (shadow default) :foreground "gray34"))))
+ '(line-number-current-line ((t (:inherit line-number :foreground "gray60"))))
  '(mode-line ((t (:background "dim gray" :foreground "black" :box (:line-width 1 :style released-button)))))
  '(parenthesis ((t (:inherit default :foreground "dim gray"))))
  '(show-paren-match ((t (:background "#2f334b")))))
 
 (load "~/.emacs.d/paths.el")
 
-(require 'settings)
 
-(server-start)
+
+(defun magit-turn-on-auto-revert-mode-if-desired (&optional file)
+  (if file
+      (--when-let (find-buffer-visiting file)
+        (with-current-buffer it
+          (magit-turn-on-auto-revert-mode-if-desired)))
+    (when (and buffer-file-name
+               (file-readable-p buffer-file-name)
+               (magit-toplevel)
+               (or (not magit-auto-revert-tracked-only)
+                   (magit-file-tracked-p buffer-file-name)))
+      (unless (or auto-revert-mode global-auto-revert-mode)
+        (auto-revert-mode)))))
+
+
+(keyboard-translate ?\( ?\[)
+(keyboard-translate ?\[ ?\()
+(keyboard-translate ?\) ?\])
+(keyboard-translate ?\] ?\))
+
+(require 'settings)
+(setq default-input-method "cyrillic-jcuken")
+(yatemplate-fill-alist)
+;; (server-start)
+
+
+(defun magit-turn-on-auto-revert-mode-if-desired (&optional file)
+  (if file
+      (--when-let (find-buffer-visiting file)
+        (with-current-buffer it
+          (magit-turn-on-auto-revert-mode-if-desired)))
+    (when (and buffer-file-name
+               (file-readable-p buffer-file-name)
+               (magit-toplevel)
+               (or (not magit-auto-revert-tracked-only)
+                   (magit-file-tracked-p buffer-file-name)))
+      (unless (or auto-revert-mode global-auto-revert-mode)
+        (auto-revert-mode)))))
+
+
+(keyboard-translate ?\( ?\[)
+(keyboard-translate ?\[ ?\()
+(keyboard-translate ?\) ?\])
+(keyboard-translate ?\] ?\))
+
+(require 'ansi-color)
+(defun colorize-compilation-buffer ()
+  (let ((inhibit-read-only t))
+    (ansi-color-apply-on-region (point-min) (point-max))))
+(add-hook 'compilation-filter-hook 'colorize-compilation-buffer)
