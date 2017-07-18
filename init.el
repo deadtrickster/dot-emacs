@@ -66,3 +66,32 @@
 http://emacsredux.com/blog/2013/05/18/instant-access-to-init-dot-el/"
   (interactive)
   (find-file-other-window user-init-file))
+
+
+;;;; $ cat ~/.config/systemd/user/default.target.wants/emacs.service
+;; [Unit]
+;; Description=Emacs text editor
+;; Documentation=info:emacs man:emacs(1) https://gnu.org/software/emacs/
+;;
+;; [Service]
+;; Type=simple
+;; ExecStart=/usr/local/bin/emacs --fg-daemon
+;; ExecStop=/usr/local/bin/emacsclient --eval "(kill-emacs)"
+;; Environment=SSH_AUTH_SOCK=%t/keyring/ssh
+;; Restart=on-failure
+;;
+;; [Install]
+;; WantedBy=default.target
+;;;;
+
+
+;;;; $ cat /usr/bin/emacs-client.sh 
+;; #!/bin/bash
+;;
+;; emacsclient -n -e "(if (> (length (frame-list)) 1) 't)" | grep t
+;; if [ "$?" = "1" ]; then
+;;     emacsclient -c -n -a "" "$@"
+;; else
+;;     emacsclient -n -a "" "$@"
+;; fi
+;;;;
