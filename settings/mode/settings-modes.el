@@ -13,5 +13,6 @@
 (require 'mode-rainbow)
 (require 'mode-diff-hl)
 (require 'mode-iedit)
+(require 'mode-magit)
 
 (provide 'settings-modes)
