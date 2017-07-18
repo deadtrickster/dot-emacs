@@ -49,6 +49,8 @@
  '(parenthesis ((t (:inherit default :foreground "dim gray"))))
  '(show-paren-match ((t (:background "#2f334b")))))
 
+(package-install-selected-packages)
+
 (load "~/.emacs.d/paths.el")
 
 (require 'settings)
