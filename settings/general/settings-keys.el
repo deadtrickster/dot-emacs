@@ -43,4 +43,7 @@
         (newline-and-indent)))))
 (global-set-key [C-return] 'insert-newline-before-line)
 
+
+(global-set-key (kbd "C-x v p") 'git-messenger:popup-message)
+
 (provide 'settings-keys)
