@@ -3,7 +3,9 @@
                   (setq indent-tabs-mode nil)
 		  (alchemist-mode)
 		  (company-mode)
-		  (flycheck-credo-setup)
 		  (local-set-key (kbd "RET") 'newline-and-indent))))
+
+(require 'flycheck-credo)
+(flycheck-credo-setup)
 
 (provide 'lang-elixir)

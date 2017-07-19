@@ -1,6 +1,3 @@
-(eval-after-load 'flycheck
-  '(flycheck-credo-setup))
-
 (require 'settings-packages)
 (require 'settings-ui)
 (require 'settings-modes)
