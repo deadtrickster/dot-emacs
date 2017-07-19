@@ -65,6 +65,10 @@
 
 (powerline-my-theme)
 
+(setq frame-title-format
+      '(buffer-file-name "%f"
+			 (dired-directory dired-directory "%b")))
+
 (provide 'settings-ui)
 
 ;;; settings-ui.el ends here

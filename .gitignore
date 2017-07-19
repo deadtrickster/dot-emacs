@@ -30,3 +30,4 @@ logs/
 /image-dired/
 /projectile-bookmarks.eld
 /network-security.data
+secrets.el

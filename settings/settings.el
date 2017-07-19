@@ -11,4 +11,6 @@
 (require 'settings-reloading)
 (require 'settings-editing)
 (require 'settings-ansi-color)
+(require 'settings-general)
+
 (provide 'settings)
