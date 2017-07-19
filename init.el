@@ -31,7 +31,7 @@
  '(powerline-default-separator (quote wave))
  '(projectile-mode t)
  '(send-mail-function (quote smtpmail-send-it))
- '(temporary-file-directory "/mnt/ramdisk")
+ '(temporary-file-directory "/tmp")
  '(tool-bar-mode nil)
  '(truncate-lines t)
  '(yas-global-mode t))
@@ -95,4 +95,8 @@ http://emacsredux.com/blog/2013/05/18/instant-access-to-init-dot-el/"
 ;; else
 ;;     emacsclient -n -a "" "$@"
 ;; fi
+;;;;
+
+;;;; Ramdisk for /tmp
+;; tmpfs    /tmp            tmpfs defaults,noatime,nosuid,nodev,noexec,mode=1777,size=512M  0 0
 ;;;;
