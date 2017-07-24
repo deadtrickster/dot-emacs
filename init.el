@@ -1,4 +1,13 @@
 
+
+
+
+
+
+
+
+
+
 ;; Added by Package.el.  This must come before configurations of
 ;; installed packages.  Don't delete this line.  If you don't want it,
 ;; just comment it out by adding a semicolon to the start of the line.
@@ -15,6 +24,8 @@
  '(auto-revert-use-notify t)
  '(display-line-numbers t)
  '(display-line-numbers-width 3)
+ '(display-time-24hr-format t)
+ '(display-time-default-load-average 0)
  '(display-time-mode t)
  '(doc-view-continuous t)
  '(erlang-argument-indent 2)
@@ -27,9 +38,11 @@
  '(hscroll-step 1)
  '(inhibit-startup-echo-area-message "dead")
  '(inhibit-startup-screen t)
+ '(initial-buffer-choice nil)
+ '(initial-scratch-message nil)
  '(package-selected-packages
    (quote
-    (pdf-tools makefile-executor git-messenger xterm-color magithub copy-as-format git-timemachine git-link scroll-restore counsel ivy company-erlang counsel-projectile projectile projectile-variable yatemplate ivy-erlang-complete dockerfile-mode ag company-nixos-options nix-buffer nix-mode nix-sandbox nixos-options flycheck-elixir flycheck-credo fill-column-indicator magit markdown-mode markdown-mode+ markdown-preview-mode markdown-toc yaml-mode elixir-yasnippets lfe-mode alchemist auctex protobuf-mode ac-alchemist iedit ac-php ac-js2 powerline diff-hl json-mode flycheck-mix less-css-mode sass-mode scss-mode php-mode iedit alchemist web-mode rainbow-mode erlang ac-slime js2-refactor paredit paren-face auto-complete go-autocomplete go-eldoc yasnippet flycheck go-mode highlight-numbers hl-todo)))
+    (dashboard flycheck-color-mode-line pdf-tools makefile-executor git-messenger xterm-color magithub copy-as-format git-timemachine git-link scroll-restore counsel ivy company-erlang counsel-projectile projectile projectile-variable yatemplate ivy-erlang-complete dockerfile-mode ag company-nixos-options nix-buffer nix-mode nix-sandbox nixos-options flycheck-elixir flycheck-credo magit markdown-mode markdown-mode+ markdown-preview-mode markdown-toc yaml-mode elixir-yasnippets lfe-mode alchemist auctex protobuf-mode ac-alchemist iedit ac-php ac-js2 powerline diff-hl json-mode flycheck-mix less-css-mode sass-mode scss-mode php-mode iedit alchemist web-mode rainbow-mode erlang ac-slime js2-refactor paredit paren-face auto-complete go-autocomplete go-eldoc yasnippet flycheck go-mode highlight-numbers hl-todo)))
  '(pdf-tools-handle-upgrades nil)
  '(powerline-default-separator (quote wave))
  '(projectile-mode t nil (projectile))
@@ -79,7 +92,7 @@
 ;;;;
 
 
-;;;; $ cat /usr/bin/emacs-client.sh 
+;;;; $ cat /usr/bin/emacs-client.sh
 ;; #!/bin/bash
 ;;
 ;; emacsclient -n -e "(if (> (length (frame-list)) 1) 't)" | grep t
@@ -93,3 +106,4 @@
 ;;;; Ramdisk for /tmp
 ;; tmpfs    /tmp            tmpfs defaults,noatime,nosuid,nodev,noexec,mode=1777,size=512M  0 0
 ;;;;
+(defun turn-on-fci-mode ())

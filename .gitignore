@@ -7,7 +7,8 @@ ac-*
 ido*
 autoloads.el
 cus-dirs.el
-archive/
+recentf
+tramp
 backups/
 compile.log
 data-alt/
