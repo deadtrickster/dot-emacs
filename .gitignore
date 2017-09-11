@@ -32,3 +32,5 @@ logs/
 /projectile-bookmarks.eld
 /network-security.data
 secrets.el
+magithub
+bookmarks

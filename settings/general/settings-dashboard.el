@@ -33,4 +33,4 @@
 	   (lambda ()
 	     (get-buffer dashboard-buffer-name)))))
 
-(provide 'setting-dashboard)
+(provide 'settings-dashboard)
