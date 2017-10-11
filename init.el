@@ -1,13 +1,3 @@
-
-
-
-
-
-
-
-
-
-
 ;; Added by Package.el.  This must come before configurations of
 ;; installed packages.  Don't delete this line.  If you don't want it,
 ;; just comment it out by adding a semicolon to the start of the line.
@@ -42,13 +32,13 @@
  '(initial-scratch-message nil)
  '(package-selected-packages
    (quote
-    (package-utils fill-column-indicator dashboard flycheck-color-mode-line pdf-tools makefile-executor git-messenger xterm-color magithub copy-as-format git-timemachine git-link scroll-restore counsel ivy company-erlang counsel-projectile projectile projectile-variable yatemplate ivy-erlang-complete dockerfile-mode ag company-nixos-options nix-buffer nix-mode nix-sandbox nixos-options flycheck-elixir flycheck-credo magit markdown-mode markdown-mode+ markdown-preview-mode markdown-toc yaml-mode elixir-yasnippets lfe-mode alchemist auctex protobuf-mode ac-alchemist iedit ac-php ac-js2 powerline diff-hl json-mode flycheck-mix less-css-mode sass-mode scss-mode php-mode iedit alchemist web-mode rainbow-mode erlang ac-slime js2-refactor paredit paren-face auto-complete go-autocomplete go-eldoc yasnippet flycheck go-mode highlight-numbers hl-todo)))
- '(pdf-tools-handle-upgrades nil)
+    (package-utils dashboard flycheck-color-mode-line makefile-executor git-messenger xterm-color magithub copy-as-format git-timemachine git-link scroll-restore counsel ivy company-erlang counsel-projectile projectile projectile-variable yatemplate ivy-erlang-complete dockerfile-mode ag company-nixos-options nix-buffer nix-mode nix-sandbox nixos-options flycheck-elixir flycheck-credo magit markdown-mode markdown-mode+ markdown-preview-mode markdown-toc yaml-mode elixir-yasnippets lfe-mode alchemist auctex protobuf-mode ac-alchemist iedit ac-php ac-js2 powerline diff-hl json-mode flycheck-mix less-css-mode sass-mode scss-mode php-mode iedit alchemist web-mode rainbow-mode erlang ac-slime js2-refactor paredit paren-face auto-complete go-autocomplete go-eldoc yasnippet flycheck go-mode highlight-numbers hl-todo)))
  '(powerline-default-separator (quote wave))
  '(projectile-mode t nil (projectile))
  '(send-mail-function (quote smtpmail-send-it))
  '(temporary-file-directory "/tmp")
  '(tool-bar-mode nil)
+ '(tramp-syntax (quote default) nil (tramp))
  '(truncate-lines t)
  '(yas-global-mode t))
 (custom-set-faces
@@ -64,6 +54,9 @@
  '(link ((t (:slant italic))))
  '(mode-line ((t (:background "dim gray" :foreground "black" :box (:line-width 1 :style released-button)))))
  '(parenthesis ((t (:inherit default :foreground "dim gray"))))
+ '(powerline-active1 ((t (:inherit mode-line :background "grey17" :foreground "gray"))))
+ '(powerline-active2 ((t (:inherit mode-line :background "grey40" :foreground "gray"))))
+ '(powerline-inactive1 ((t (:inherit mode-line-inactive :background "grey11" :foreground "#666666"))))
  '(show-paren-match ((t (:background "#2f334b")))))
 
 (package-install-selected-packages)
@@ -106,3 +99,4 @@
 ;;;; Ramdisk for /tmp
 ;; tmpfs    /tmp            tmpfs defaults,noatime,nosuid,nodev,noexec,mode=1777,size=512M  0 0
 ;;;;
+(defun turn-on-fci-mode ())

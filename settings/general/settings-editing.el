@@ -1,3 +1,4 @@
+
 (delete-selection-mode 1)
 
 (add-hook 'prog-mode-hook 'highlight-numbers-mode)
@@ -20,6 +21,11 @@
               (keyboard-translate ?\[ ?\()
               (keyboard-translate ?\) ?\])
               (keyboard-translate ?\] ?\)))))
+
+(keyboard-translate ?\( ?\[)
+(keyboard-translate ?\[ ?\()
+(keyboard-translate ?\) ?\])
+(keyboard-translate ?\] ?\))
 
 (defun rename-file-and-buffer ()
   "Rename the current buffer and file it is visiting."

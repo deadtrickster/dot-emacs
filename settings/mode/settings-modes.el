@@ -15,7 +15,7 @@
 (require 'mode-iedit)
 (require 'mode-magit)
 (require 'mode-makefile)
-(require 'mode-pdf-tools)
+;; (require 'mode-pdf-tools)
 (require 'mode-prog-mode)
 
 (provide 'settings-modes)
