@@ -9,6 +9,8 @@
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
+ '(ansi-color-names-vector
+   ["dim gray" "red4" "green4" "yellow4" "deep sky blue" "magenta4" "cyan4" "white"])
  '(auto-insert-mode t)
  '(auto-revert-interval 1)
  '(auto-revert-use-notify t)
@@ -32,7 +34,7 @@
  '(initial-scratch-message nil)
  '(package-selected-packages
    (quote
-    (package-utils dashboard flycheck-color-mode-line makefile-executor git-messenger xterm-color magithub copy-as-format git-timemachine git-link scroll-restore counsel ivy company-erlang counsel-projectile projectile projectile-variable yatemplate ivy-erlang-complete dockerfile-mode ag company-nixos-options nix-buffer nix-mode nix-sandbox nixos-options flycheck-elixir flycheck-credo magit markdown-mode markdown-mode+ markdown-preview-mode markdown-toc yaml-mode elixir-yasnippets lfe-mode alchemist auctex protobuf-mode ac-alchemist iedit ac-php ac-js2 powerline diff-hl json-mode flycheck-mix less-css-mode sass-mode scss-mode php-mode iedit alchemist web-mode rainbow-mode erlang ac-slime js2-refactor paredit paren-face auto-complete go-autocomplete go-eldoc yasnippet flycheck go-mode highlight-numbers hl-todo)))
+    (package-utils dashboard flycheck-color-mode-line makefile-executor git-messenger xterm-color magithub copy-as-format git-timemachine git-link scroll-restore counsel ivy counsel-projectile projectile projectile-variable yatemplate dockerfile-mode ag company-nixos-options nix-buffer nix-mode nix-sandbox nixos-options flycheck-elixir flycheck-credo magit markdown-mode markdown-mode+ markdown-preview-mode markdown-toc yaml-mode elixir-yasnippets lfe-mode alchemist auctex protobuf-mode ac-alchemist iedit ac-php ac-js2 powerline diff-hl json-mode flycheck-mix less-css-mode sass-mode scss-mode php-mode iedit alchemist web-mode rainbow-mode erlang ac-slime js2-refactor paredit paren-face auto-complete go-autocomplete go-eldoc yasnippet flycheck go-mode highlight-numbers hl-todo)))
  '(powerline-default-separator (quote wave))
  '(projectile-mode t nil (projectile))
  '(send-mail-function (quote smtpmail-send-it))
@@ -100,3 +102,6 @@
 ;; tmpfs    /tmp            tmpfs defaults,noatime,nosuid,nodev,noexec,mode=1777,size=512M  0 0
 ;;;;
 (defun turn-on-fci-mode ())
+(defun recompile-everything ()
+  (interactive)
+  (byte-recompile-directory "~/.emacs.d" 0 'force))
