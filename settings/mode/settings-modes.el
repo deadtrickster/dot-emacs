@@ -17,5 +17,8 @@
 (require 'mode-makefile)
 ;; (require 'mode-pdf-tools)
 (require 'mode-prog-mode)
+(require 'mode-isearch)
+(require 'mode-dired)
+(require 'mode-log)
 
 (provide 'settings-modes)

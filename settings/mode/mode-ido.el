@@ -3,9 +3,6 @@
 (ido-mode t)
 (ido-everywhere 1)
 
-(setf debug-on-error t
-      debug-on-signal nil)
-
 (defun ido-name (item)
   ;; Return file name for current item, whether in a normal list
   ;; or a merged work directory list.

@@ -1,3 +1,5 @@
+
+
 (require 'dashboard)
 
 (setq dashboard-items '((recents  . 20)))
@@ -18,13 +20,13 @@
 
 (dashboard-setup-startup-hook)
 
-(add-hook 'dashboard-mode-hook
-		      (lambda ()
-			(setf display-line-numbers nil)))
+;; (add-hook 'dashboard-mode-hook
+;; 		      (lambda ()
+;; 			(setf display-line-numbers nil)))
 
-(add-hook 'after-make-frame-functions
-	  (lambda (_)
-	    (dashboard-refresh-buffer)))
+;; (add-hook 'after-make-frame-functions
+;; 	  (lambda (_)
+;; 	    (dashboard-refresh-buffer)))
 
 (add-hook
    'emacs-startup-hook
