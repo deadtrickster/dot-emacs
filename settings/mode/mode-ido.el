@@ -3,10 +3,10 @@
 (ido-mode t)
 (ido-everywhere 1)
 
-(defun ido-name (item)
-  ;; Return file name for current item, whether in a normal list
-  ;; or a merged work directory list.
-  (concat (if (consp item) (car item) item)))
+;; (defun ido-name (item)
+;;   ;; Return file name for current item, whether in a normal list
+;;   ;; or a merged work directory list.
+;;   (concat (if (consp item) (car item) item)))
 
 (global-set-key
  "\M-x"

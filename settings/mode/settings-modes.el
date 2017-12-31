@@ -1,4 +1,5 @@
-(require 'mode-ac)
+;; (require 'mode-ac)
+(require 'mode-company)
 (require 'mode-web-mode)
 (require 'mode-js2)
 (require 'mode-erlang)

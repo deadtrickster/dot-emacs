@@ -5,5 +5,6 @@
 (require 'lang-cl)
 (require 'lang-php)
 (require 'lang-elixir)
+(require 'lang-cpp)
 
 (provide 'settings-langs)

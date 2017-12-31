@@ -26,6 +26,7 @@
 (define-key global-map [(control insert)] 'overwrite-mode)
 
 (global-set-key [f12] 'indent-whole-buffer)
+(global-set-key [C-tab] 'company-complete)
 
 (defun insert-newline-before-line ()
   (interactive)

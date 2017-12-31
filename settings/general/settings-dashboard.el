@@ -1,8 +1,20 @@
 
-
+(require 'use-package-bind-key)
+(require 'use-package)
+(require 'bind-key)
 (require 'dashboard)
 
-(setq dashboard-items '((recents  . 20)))
+(use-package dashboard
+  :bind (
+	 :map dashboard-mode-map
+	      ("<down-mouse-1>" . nil)
+	      ("<mouse-1>" . widget-button-click)
+	      ("<mouse-2>" . widget-button-click))
+  :config
+  (setq dashboard-startup-banner 'official)
+  (setq dashboard-items '((recents  . 20)
+			  (bookmarks . 20)))
+  (dashboard-setup-startup-hook))
 
 (defun dashboard-insert-image-banner (banner)
   "Display an image BANNER."
@@ -24,9 +36,9 @@
 ;; 		      (lambda ()
 ;; 			(setf display-line-numbers nil)))
 
-;; (add-hook 'after-make-frame-functions
-;; 	  (lambda (_)
-;; 	    (dashboard-refresh-buffer)))
+(add-hook 'after-make-frame-functions
+	  (lambda (_)
+	    (dashboard-refresh-buffer)))
 
 (add-hook
    'emacs-startup-hook
