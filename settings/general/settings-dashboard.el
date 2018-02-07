@@ -47,4 +47,7 @@
 	   (lambda ()
 	     (get-buffer dashboard-buffer-name)))))
 
+(add-to-list 'recentf-exclude "\\.emacs\\.d/elpa")
+(add-to-list 'recentf-exclude "\\.emacs\\.d/bookmarks")
+
 (provide 'settings-dashboard)

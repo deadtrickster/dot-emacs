@@ -35,3 +35,7 @@ secrets.el
 magithub
 bookmarks
 .company-s*
+.history
+games
+irony
+url
