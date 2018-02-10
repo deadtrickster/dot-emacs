@@ -9,5 +9,6 @@ http://emacsredux.com/blog/2013/05/18/instant-access-to-init-dot-el/"
 (require 'settings-ansi-color)
 (require 'settings-dashboard)
 (require 'settings-delight)
+(require 'settings-neotree)
 
 (provide 'settings-general)

@@ -21,5 +21,6 @@
 (require 'mode-isearch)
 (require 'mode-dired)
 (require 'mode-log)
+(require 'mode-fringe)
 
 (provide 'settings-modes)
