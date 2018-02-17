@@ -35,9 +35,6 @@
  '(display-line-numbers-widen t)
  '(display-line-numbers-width nil)
  '(display-line-numbers-width-start t)
- '(display-time-24hr-format t)
- '(display-time-default-load-average 0)
- '(display-time-mode t)
  '(doc-view-continuous t)
  '(erlang-argument-indent 2)
  '(erlang-icr-indent nil)
@@ -48,6 +45,7 @@
  '(flycheck-elixir-credo-strict t)
  '(flycheck-indication-mode 'right-fringe)
  '(flycheck-mode-line-prefix "Syntax")
+ '(fringe-mode '(11) nil (fringe))
  '(git-messenger:show-detail t)
  '(git-messenger:use-magit-popup nil)
  '(global-hl-todo-mode t)
@@ -61,7 +59,7 @@
  '(ivy-wrap t)
  '(menu-bar-mode nil)
  '(package-selected-packages
-   '(pos-tip bm neotree magit magithub delight company-c-headers company-erlang auto-compile company-statistics use-package bind-key fill-column-indicator package-utils dashboard flycheck-color-mode-line makefile-executor git-messenger xterm-color copy-as-format git-timemachine git-link scroll-restore counsel ivy counsel-projectile projectile projectile-variable yatemplate dockerfile-mode ag company-nixos-options nix-buffer nix-mode nix-sandbox nixos-options flycheck-elixir flycheck-credo markdown-mode markdown-mode+ markdown-preview-mode markdown-toc yaml-mode elixir-yasnippets lfe-mode alchemist auctex protobuf-mode ac-alchemist iedit ac-php ac-js2 powerline diff-hl json-mode flycheck-mix sass-mode scss-mode php-mode iedit alchemist web-mode rainbow-mode erlang ac-slime js2-refactor paredit paren-face auto-complete go-autocomplete go-eldoc yasnippet flycheck go-mode highlight-numbers hl-todo))
+   '(neotree delight pos-tip auto-compile company-erlang ivy-erlang-complete company-statistics use-package bind-key fill-column-indicator package-utils dashboard flycheck-color-mode-line makefile-executor git-messenger xterm-color magithub copy-as-format git-timemachine git-link scroll-restore counsel ivy counsel-projectile projectile projectile-variable yatemplate dockerfile-mode ag company-nixos-options nix-buffer nix-mode nix-sandbox nixos-options flycheck-elixir flycheck-credo magit markdown-mode markdown-mode+ markdown-preview-mode markdown-toc yaml-mode elixir-yasnippets lfe-mode alchemist auctex protobuf-mode ac-alchemist iedit ac-php ac-js2 powerline diff-hl json-mode flycheck-mix sass-mode scss-mode php-mode iedit alchemist web-mode rainbow-mode erlang ac-slime js2-refactor paredit paren-face auto-complete go-autocomplete go-eldoc yasnippet flycheck go-mode highlight-numbers hl-todo))
  '(powerline-default-separator 'wave)
  '(projectile-mode t nil (projectile))
  '(projectile-mode-line '(:eval (format " [%s]" (projectile-project-name))))
@@ -84,7 +82,7 @@
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
- '(default ((t (:inherit nil :stipple nil :background "#181a26" :foreground "gray80" :inverse-video nil :box nil :strike-through nil :overline nil :underline nil :slant normal :weight normal :height 114 :width normal :foundry "pyrs" :family "Roboto Mono"))))
+ '(default ((t (:inherit nil :stipple nil :background "#181a26" :foreground "gray80" :inverse-video nil :box nil :strike-through nil :overline nil :underline nil :slant normal :weight normal :height 116 :width normal :foundry "pyrs" :family "Roboto Mono"))))
  '(company-preview ((t (:foreground "darkgray" :underline t))))
  '(company-preview-common ((t (:inherit company-preview))))
  '(company-scrollbar-bg ((t (:background "dark gray"))))
@@ -103,10 +101,13 @@
  '(line-number ((t (:inherit (shadow default) :foreground "gray34"))))
  '(line-number-current-line ((t (:inherit line-number :foreground "gray60"))))
  '(link ((t (:slant italic))))
- '(mode-line ((t (:background "dim gray" :foreground "black" :box (:line-width 1 :style released-button)))))
+ '(mode-line ((t (:background "dim gray" :foreground "black" :box (:line-width 1 :color "gray40")))))
+ '(mode-line-buffer-id ((t (:inherit powerline-active2 :foreground "blue4" :weight bold))))
+ '(mode-line-buffer-id-inactive ((t (:inherit powerline-inactive2  :weight bold))))
+ '(mode-line-inactive ((t (:inherit mode-line-inactive :foreground "black" :box (:line-width 1 :color "gray40")))))
  '(parenthesis ((t (:inherit default :foreground "dim gray"))))
  '(powerline-active1 ((t (:inherit mode-line :background "grey17" :foreground "gray"))))
- '(powerline-active2 ((t (:inherit mode-line :background "grey40" :foreground "gray"))))
+ '(powerline-active2 ((t (:inherit mode-line :background "grey40" :foreground "black"))))
  '(powerline-inactive1 ((t (:inherit mode-line-inactive :background "grey11" :foreground "#666666"))))
  '(show-paren-match ((t (:background "#2f334b")))))
 
@@ -156,23 +157,27 @@
   (byte-recompile-directory "~/.emacs.d" 0 'force))
 (defalias 'yes-or-no-p 'y-or-n-p)
 
-
 (require 'pos-tip)
 
-;; (global-set-key (kbd "<left-fringe> <mouse-1>") (lambda (ev)
-;;                                                   (interactive "e")
-;;                                                   (let* ((pos (posn-point (event-start ev)))
-;;                                                          (overlay (car (overlays-at pos))))
-;;                                                     (when overlay
-;;                                                       (let* ((diff-type (overlay-get overlay 'diff-type))
-;;                                                              (diff-content (overlay-get overlay 'diff-content)))
-;;                                                         (when (eq diff-type 'change)
-;;                                                           (let ((lines (split-string diff-content "[\n\r]+" )))
-;;                                                             (pos-tip-show-no-propertize
-;;                                                              (mapconcat (lambda (line)
-;;                                                                           (if (> (length line) 1)
-;;                                                                               (cond
-;;                                                                                ((= (aref line 0) ?+) (propertize (concat line "\n") 'face 'diff-added))
-;;                                                                                ((= (aref line 0) ?-) (propertize  (concat line "\n") 'face 'diff-removed))))
-;;                                                                           ) (seq-drop lines 1) "")
-;;                                                              'diff-added pos))))))))
+(global-set-key (kbd "<left-fringe> <mouse-1>")
+                (lambda (ev)
+                  (interactive "e")
+                  (let* ((pos (posn-point (event-start ev)))
+                         (overlay (car (overlays-at pos))))
+                    (when overlay
+                      (let* ((diff-type (overlay-get overlay 'diff-type))
+                             (diff-content (overlay-get overlay 'diff-content)))
+                        (when (and diff-content
+                                   (or (eq diff-type 'change)
+                                       (eq diff-type 'delete)))
+                          (let ((lines (split-string diff-content "[\n\r]+" )))
+                            (pos-tip-show-no-propertize
+                             (mapconcat (lambda (line)
+                                          (if (> (length line) 1)
+                                              (cond
+                                               ((= (aref line 0) ?+) (propertize (concat line "\n") 'face 'diff-added))
+                                               ((= (aref line 0) ?-) (propertize  (concat line "\n") 'face 'diff-removed))))) (seq-drop lines 1) "")
+                             'diff-added pos))))))))
+(use-package server
+  :config
+  (unless (server-running-p) (server-start)))

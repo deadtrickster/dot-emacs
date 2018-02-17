@@ -1,9 +1,6 @@
 
 (delete-selection-mode 1)
 
-(add-hook 'prog-mode-hook 'highlight-numbers-mode)
-(add-hook 'prog-mode-hook 'hl-todo-mode)
-
 (defun my-turn-off-some-parens ()
   "Turn on brackets and braces as paren characters."
   (interactive)

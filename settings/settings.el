@@ -1,4 +1,5 @@
 (require 'settings-packages)
+(require 'bind-key)
 (require 'settings-ui)
 (require 'settings-modes)
 (require 'settings-backups)

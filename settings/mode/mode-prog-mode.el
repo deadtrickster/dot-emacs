@@ -4,5 +4,6 @@
 ;; Highlight and follow bug references in comments and strings
 (add-hook 'prog-mode-hook 'bug-reference-prog-mode)
 (add-hook 'prog-mode-hook 'display-line-numbers-mode)
+(add-hook 'prog-mode-hook 'highlight-numbers-mode)
 
 (provide 'mode-prog-mode)

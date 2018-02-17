@@ -22,5 +22,6 @@
 (require 'mode-dired)
 (require 'mode-log)
 (require 'mode-fringe)
+(require 'mode-ivy)
 
 (provide 'settings-modes)

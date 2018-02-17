@@ -1,3 +1,3 @@
-(fringe-mode '(10 . nil))
+;(fringe-mode '(11 . nil))
 
 (provide 'mode-fringe)
