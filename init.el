@@ -56,6 +56,7 @@
  '(inhibit-startup-screen t)
  '(initial-buffer-choice nil)
  '(initial-scratch-message nil)
+ '(ivy-erlang-complete-erlang-root "/usr/home/dead/bin/otp/20.1/")
  '(ivy-wrap t)
  '(menu-bar-mode nil)
  '(package-selected-packages
@@ -103,8 +104,8 @@
  '(link ((t (:slant italic))))
  '(mode-line ((t (:background "dim gray" :foreground "black" :box (:line-width 1 :color "gray40")))))
  '(mode-line-buffer-id ((t (:inherit powerline-active2 :foreground "blue4" :weight bold))))
- '(mode-line-buffer-id-inactive ((t (:inherit powerline-inactive2  :weight bold))))
- '(mode-line-inactive ((t (:inherit mode-line-inactive :foreground "black" :box (:line-width 1 :color "gray40")))))
+ '(mode-line-buffer-id-inactive ((t (:inherit powerline-inactive2 :weight bold))))
+ '(mode-line-inactive ((t (:foreground "black" :box (:line-width 1 :color "gray40")))))
  '(parenthesis ((t (:inherit default :foreground "dim gray"))))
  '(powerline-active1 ((t (:inherit mode-line :background "grey17" :foreground "gray"))))
  '(powerline-active2 ((t (:inherit mode-line :background "grey40" :foreground "black"))))
