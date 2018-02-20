@@ -24,4 +24,9 @@
 
 (setq mixfmt-mix "/usr/local/bin/mix")
 
+(add-hook 'mix-format-hook '(lambda ()
+                              (if (projectile-project-p)
+                                  (setq mixfmt-args (list "--dot-formatter" (concat (projectile-project-root) "/.formatter.exs")))
+                                (setq mixfmt-args nil))))
+
 (provide 'lang-elixir)

@@ -19,6 +19,8 @@
  '(auto-insert-mode t)
  '(auto-revert-interval 1)
  '(auto-revert-use-notify t)
+ '(auto-save-default t)
+ '(backup-by-copying t)
  '(c-basic-offset 4)
  '(c-default-style
    '((c++-mode . "bsd")
@@ -58,9 +60,10 @@
  '(initial-scratch-message nil)
  '(ivy-erlang-complete-erlang-root "/usr/home/dead/bin/otp/20.1/")
  '(ivy-wrap t)
+ '(make-backup-files t)
  '(menu-bar-mode nil)
  '(package-selected-packages
-   '(neotree delight pos-tip auto-compile company-erlang ivy-erlang-complete company-statistics use-package bind-key fill-column-indicator package-utils dashboard flycheck-color-mode-line makefile-executor git-messenger xterm-color magithub copy-as-format git-timemachine git-link scroll-restore counsel ivy counsel-projectile projectile projectile-variable yatemplate dockerfile-mode ag company-nixos-options nix-buffer nix-mode nix-sandbox nixos-options flycheck-elixir flycheck-credo magit markdown-mode markdown-mode+ markdown-preview-mode markdown-toc yaml-mode elixir-yasnippets lfe-mode alchemist auctex protobuf-mode ac-alchemist iedit ac-php ac-js2 powerline diff-hl json-mode flycheck-mix sass-mode scss-mode php-mode iedit alchemist web-mode rainbow-mode erlang ac-slime js2-refactor paredit paren-face auto-complete go-autocomplete go-eldoc yasnippet flycheck go-mode highlight-numbers hl-todo))
+   '(flycheck-dialyxir neotree delight pos-tip auto-compile company-erlang ivy-erlang-complete company-statistics use-package bind-key fill-column-indicator package-utils dashboard flycheck-color-mode-line makefile-executor git-messenger xterm-color magithub copy-as-format git-timemachine git-link scroll-restore counsel ivy counsel-projectile projectile projectile-variable yatemplate dockerfile-mode ag company-nixos-options nix-buffer nix-mode nix-sandbox nixos-options flycheck-elixir flycheck-credo magit markdown-mode markdown-mode+ markdown-preview-mode markdown-toc yaml-mode elixir-yasnippets lfe-mode alchemist auctex protobuf-mode ac-alchemist iedit ac-php ac-js2 powerline diff-hl json-mode flycheck-mix sass-mode scss-mode php-mode iedit alchemist web-mode rainbow-mode erlang ac-slime js2-refactor paredit paren-face auto-complete go-autocomplete go-eldoc yasnippet flycheck go-mode highlight-numbers hl-todo))
  '(powerline-default-separator 'wave)
  '(projectile-mode t nil (projectile))
  '(projectile-mode-line '(:eval (format " [%s]" (projectile-project-name))))
