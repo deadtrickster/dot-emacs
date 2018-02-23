@@ -9,6 +9,42 @@
 (require 'smooth-scroll)
 (setf smooth-scroll-mode t)
 
+(defun figure-out-file-name ()
+  (if (equal major-mode 'dired-mode)
+      default-directory
+    (buffer-file-name)))
+
+(defun copy-file-name ()
+  "Put the current file name on the clipboard"
+  (interactive)
+  (let ((filename (figure-out-file-name)))
+    (when filename
+      (let ((select-enable-clipboard t))
+        (kill-new filename))
+      (message filename))))
+
+(defun browse-file-directory ()
+  "Open the current file's directory however the OS would."
+  (interactive)
+  (if default-directory
+      (browse-url-of-file (expand-file-name default-directory))
+    (error "No `default-directory' to open")))
+
+(defun my-powerline-buffer-id (&optional face pad)
+  (let ((filename (figure-out-file-name)))
+    (powerline-raw
+     (format-mode-line
+      (concat " " (propertize
+                   (format-mode-line mode-line-buffer-identification)
+                   'face face
+                   'mouse-face 'mode-line-highlight
+                   'help-echo (concat filename "\n\ mouse-1: Copy filename\n\ mouse-3: Open directory")
+                   'local-map (let ((map (make-sparse-keymap)))
+                                (define-key map [mode-line mouse-1] 'copy-file-name)
+                                (define-key map [mode-line mouse-3] 'browse-file-directory)
+                                map))))
+     face pad)))
+
 (defun powerline-my-theme ()
   "Setup the default mode-line."
   (interactive)
@@ -31,12 +67,10 @@
                                  (powerline-raw ": " face2 'l)
                                  (powerline-raw "%3c" face2 'r)
                                  (powerline-raw " " face2)
-                                 (powerline-buffer-id mode-line-buffer-id 'l)
+                                 (my-powerline-buffer-id mode-line-buffer-id 'l)
                                  (powerline-raw " " face2)))
                           (center
                            (list (funcall separator-right face2 face1)
-                                 (when (and (boundp 'erc-track-minor-mode) erc-track-minor-mode)
-                                   (powerline-raw erc-modified-channels-object face1 'l))
                                  (powerline-major-mode face1 'l)
                                  (powerline-process face1)
                                  (powerline-minor-modes face1 'l)
