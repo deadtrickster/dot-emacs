@@ -19,7 +19,8 @@
  '(auto-insert-mode t)
  '(auto-revert-interval 1)
  '(auto-revert-use-notify t)
- '(auto-save-default t)
+ '(auto-save-default nil)
+ '(auto-save-visited-mode nil)
  '(backup-by-copying t)
  '(c-basic-offset 4)
  '(c-default-style
@@ -182,6 +183,7 @@
                                                ((= (aref line 0) ?+) (propertize (concat line "\n") 'face 'diff-added))
                                                ((= (aref line 0) ?-) (propertize  (concat line "\n") 'face 'diff-removed))))) (seq-drop lines 1) "")
                              'diff-added pos))))))))
+
 (use-package server
   :config
   (unless (server-running-p) (server-start)))
