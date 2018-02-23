@@ -1,5 +1,5 @@
 (setq
- make-backup-files t
+ make-backup-files nil
  backup-by-copying t      ; don't clobber symlinks
  backup-directory-alist
  `(("." . ,temporary-file-directory))    ; don't litter my fs tree
