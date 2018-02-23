@@ -34,4 +34,8 @@
 			   "if" "let" "not" "of" "or"
 			   "orelse" "query" "receive" "rem" "try" "when"
 			   "xor"))
+
+(require 'flycheck-rebar3)
+(flycheck-rebar3-setup)
+
 (provide 'lang-erlang)

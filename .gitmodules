@@ -1,0 +1,3 @@
+[submodule "local/flycheck-rebar3"]
+	path = local/flycheck-rebar3
+	url = https://github.com/joedevivo/flycheck-rebar3.git
