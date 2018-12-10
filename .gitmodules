@@ -1,3 +1,9 @@
 [submodule "local/flycheck-rebar3"]
 	path = local/flycheck-rebar3
 	url = https://github.com/joedevivo/flycheck-rebar3.git
+[submodule "local/emacs-minimap"]
+	path = local/emacs-minimap
+	url = git@github.com:deadtrickster/emacs-minimap.git
+[submodule "local/slime-repl-ansi-color"]
+        path = local/slime-repl-ansi-color
+        url = git@github.com:deadtrickster/slime-repl-ansi-color.git

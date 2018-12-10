@@ -26,7 +26,18 @@
 (define-key global-map [(control insert)] 'overwrite-mode)
 
 (global-set-key [f12] 'indent-whole-buffer)
+(global-set-key [f11] 'delete-trailing-whitespace)
 (global-set-key [C-tab] 'company-complete)
+
+(defun swiper-with-selection ()
+  (interactive)
+  (if (and transient-mark-mode mark-active (not (eq (mark) (point))))
+      (let ((selection (buffer-substring-no-properties (mark) (point))))
+        (deactivate-mark)
+        (swiper selection))
+    (swiper)))
+
+(global-set-key "\C-s" 'swiper-with-selection)
 
 (defun insert-newline-before-line ()
   (interactive)
@@ -34,7 +45,7 @@
          (line-number-at-pos (point))))
     (if (eql current-line 1)
         (progn
-          (beginning-of-line )1
+          (beginning-of-line)
           (newline-and-indent)
           (goto-line 1)
           (indent-according-to-mode))
@@ -46,5 +57,16 @@
 
 
 (global-set-key (kbd "C-x v p") 'git-messenger:popup-message)
+
+(defun delete-current-line ()
+  "Delete (not kill) the current line."
+  (interactive)
+  (save-excursion
+    (delete-region
+     (progn (forward-visible-line 0) (point))
+     (progn (forward-visible-line 1) (point))))
+  (insert-newline-before-line))
+
+(global-set-key (kbd "C-d") 'delete-current-line)
 
 (provide 'settings-keys)

@@ -5,4 +5,6 @@
   (define-key ivy-minibuffer-map (kbd "<down>") 'ivy-next-line)
   (define-key ivy-minibuffer-map (kbd "<up>") 'ivy-previous-line))
 
+(require 'doom-todo-ivy)
+
 (provide 'mode-ivy)

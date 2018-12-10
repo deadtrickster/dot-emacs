@@ -1,3 +1,5 @@
+.cache
+session*
 /devel/
 /elpa/
 *.elc

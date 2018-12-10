@@ -4,14 +4,14 @@
 (require 'mode-js2)
 (require 'mode-erlang)
 (require 'mode-elixir)
-(require 'mode-paren)
+(require 'mode-paren);
 (require 'mode-paredit)
-(require 'mode-paren-face)
+(require 'mode-paren-face);
 (require 'mode-ido)
 (require 'mode-slime)
-(require 'mode-flyspell)
-(require 'mode-flycheck)
-(require 'mode-rainbow)
+(require 'mode-flyspell);
+(require 'mode-flycheck);
+(require 'mode-rainbow);
 (require 'mode-diff-hl)
 (require 'mode-iedit)
 (require 'mode-magit)
@@ -23,5 +23,6 @@
 (require 'mode-log)
 (require 'mode-fringe)
 (require 'mode-ivy)
+(require 'mode-term)
 
 (provide 'settings-modes)

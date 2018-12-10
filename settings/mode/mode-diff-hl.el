@@ -1,4 +1,8 @@
 
+(require 'diff-hl)
+
+(require 'diff-hl-flydiff)
+
 (defun enable-diff-hl-mode ()
   (diff-hl-mode)
   (diff-hl-flydiff-mode))

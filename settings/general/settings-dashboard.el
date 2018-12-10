@@ -2,12 +2,11 @@
 (require 'use-package-bind-key)
 (require 'use-package)
 (require 'bind-key)
-(require 'dashboard)
 
 (use-package dashboard
-  :bind (
-	 :map dashboard-mode-map
-	      ("<down-mouse-1>" . nil)
+  :bind (:map dashboard-mode-map
+	      ("<down-mouse-1>" . (lambda () (interactive)))
+	      ("<drag-mouse-1>" . (lambda () (interactive)))
 	      ("<mouse-1>" . widget-button-click)
 	      ("<mouse-2>" . widget-button-click))
   :config
@@ -37,8 +36,16 @@
 ;; 			(setf display-line-numbers nil)))
 
 (add-hook 'after-make-frame-functions
-	  (lambda (_)
-	    (dashboard-refresh-buffer)))
+	  (lambda (frame)
+            (when (= (length (frame-list)) 0)
+	      (dashboard-refresh-buffer)
+              (with-selected-frame frame
+                (switch-to-buffer (get-buffer dashboard-buffer-name))
+                ;; (bind-key "<down-mouse-1>" nil dashboard-mode-map)
+                ;; (bind-key "<drag-mouse-1>" nil dashboard-mode-map)
+                ;;(goto-char (point-min))
+	        ;;(redisplay)
+                ))))
 
 (add-hook
    'emacs-startup-hook
@@ -49,5 +56,9 @@
 
 (add-to-list 'recentf-exclude "\\.emacs\\.d/elpa")
 (add-to-list 'recentf-exclude "\\.emacs\\.d/bookmarks")
+(add-to-list 'recentf-exclude "\\.emacs\\.d/recentf")
+(add-to-list 'recentf-exclude "\\.emacs\\.d/ido.last")
+
+(run-at-time nil (* 5 60) 'recentf-save-list)
 
 (provide 'settings-dashboard)

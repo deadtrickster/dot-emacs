@@ -2,19 +2,34 @@
 ;; installed packages.  Don't delete this line.  If you don't want it,
 ;; just comment it out by adding a semicolon to the start of the line.
 ;; You may delete these explanatory comments.
+
 (setq load-prefer-newer t)
-(package-initialize)
 (require 'auto-compile)
 (auto-compile-on-load-mode)
 (auto-compile-on-save-mode)
+
+(add-to-list 'load-path "/home/dead/Projects/emacs-libvterm")
 
 (custom-set-variables
  ;; custom-set-variables was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
+ '(ag-reuse-buffers t)
+ '(ag-reuse-window nil)
+ '(alchemist-test-status-modeline nil)
  '(ansi-color-names-vector
-   ["dim gray" "red4" "green4" "yellow4" "deep sky blue" "magenta4" "cyan4" "white"])
+   [("black" . "#555753")
+    ("#CC0000" . "#EF2929")
+    ("#4E9A06" . "#8AE234")
+    ("#C4A000" . "#FCE94F")
+    ("#3465A4" . "#739FCF")
+    ("#75507B" . "#AD7FA8")
+    ("#06989A" . "#34E2E2")
+    ("#D3D7CF" . "#EEEEEC")])
+ '(auto-compile-check-parens nil)
+ '(auto-compile-ding nil)
+ '(auto-compile-use-mode-line nil)
  '(auto-compression-mode t)
  '(auto-insert-mode t)
  '(auto-revert-interval 1)
@@ -34,13 +49,15 @@
  '(company-statistics-file "~/.emacs.d/.company-statistics-cache.el")
  '(company-tooltip-maximum-width 60)
  '(company-tooltip-minimum-width 60)
+ '(counsel-ag-base-command "ag --nocolor --nogroup %s")
+ '(create-lockfiles nil)
  '(display-line-numbers-grow-only t)
- '(display-line-numbers-widen t)
- '(display-line-numbers-width nil)
  '(display-line-numbers-width-start t)
  '(doc-view-continuous t)
  '(erlang-argument-indent 2)
  '(erlang-icr-indent nil)
+ '(exec-path
+   '("/usr/local/sbin" "/usr/local/bin" "/usr/sbin" "/usr/bin" "/sbin" "/bin" "/usr/games" "/usr/local/games" "/snap/bin" "/usr/local/libexec/emacs/27.0.50/x86_64-pc-linux-gnu" "/home/dead/bin"))
  '(flycheck-check-syntax-automatically '(idle-change mode-enabled))
  '(flycheck-clang-args "-std=gnu++11")
  '(flycheck-clang-language-standard "gnu++11")
@@ -49,6 +66,7 @@
  '(flycheck-indication-mode 'right-fringe)
  '(flycheck-mode-line-prefix "Syntax")
  '(fringe-mode '(11) nil (fringe))
+ '(gc-cons-threshold 1600000)
  '(git-messenger:show-detail t)
  '(git-messenger:use-magit-popup nil)
  '(global-hl-todo-mode t)
@@ -59,26 +77,37 @@
  '(inhibit-startup-screen t)
  '(initial-buffer-choice nil)
  '(initial-scratch-message nil)
- '(ivy-erlang-complete-erlang-root "/usr/home/dead/bin/otp/20.1/")
  '(ivy-wrap t)
  '(make-backup-files t)
  '(menu-bar-mode nil)
+ '(mouse-1-click-follows-link -150)
+ '(mouse-1-click-in-non-selected-windows t)
+ '(mouse-wheel-progressive-speed nil)
+ '(mwheel-tilt-scroll-p t)
+ '(next-error-find-buffer-function 'next-error-buffer-on-selected-frame)
  '(package-selected-packages
-   '(flycheck-dialyxir neotree delight pos-tip auto-compile company-erlang ivy-erlang-complete company-statistics use-package bind-key fill-column-indicator package-utils dashboard flycheck-color-mode-line makefile-executor git-messenger xterm-color magithub copy-as-format git-timemachine git-link scroll-restore counsel ivy counsel-projectile projectile projectile-variable yatemplate dockerfile-mode ag company-nixos-options nix-buffer nix-mode nix-sandbox nixos-options flycheck-elixir flycheck-credo magit markdown-mode markdown-mode+ markdown-preview-mode markdown-toc yaml-mode elixir-yasnippets lfe-mode alchemist auctex protobuf-mode ac-alchemist iedit ac-php ac-js2 powerline diff-hl json-mode flycheck-mix sass-mode scss-mode php-mode iedit alchemist web-mode rainbow-mode erlang ac-slime js2-refactor paredit paren-face auto-complete go-autocomplete go-eldoc yasnippet flycheck go-mode highlight-numbers hl-todo))
+   '(ialign neotree ivy-erlang-complete git-commit fontawesome cmake-mode dumb-jump webkit-color-picker company-c-headers flycheck-dialyxir delight pos-tip auto-compile company-erlang company-statistics use-package bind-key fill-column-indicator package-utils dashboard flycheck-color-mode-line makefile-executor git-messenger xterm-color magithub copy-as-format git-timemachine git-link scroll-restore counsel ivy counsel-projectile projectile projectile-variable yatemplate dockerfile-mode ag flycheck-elixir flycheck-credo magit markdown-mode markdown-mode+ markdown-preview-mode markdown-toc yaml-mode elixir-yasnippets alchemist protobuf-mode ac-alchemist iedit ac-php ac-js2 powerline json-mode flycheck-mix sass-mode scss-mode php-mode iedit alchemist web-mode rainbow-mode erlang ac-slime js2-refactor paredit paren-face auto-complete go-autocomplete go-eldoc yasnippet flycheck go-mode highlight-numbers hl-todo))
  '(powerline-default-separator 'wave)
+ '(powerline-gui-use-vcs-glyph nil)
  '(projectile-mode t nil (projectile))
  '(projectile-mode-line '(:eval (format " [%s]" (projectile-project-name))))
- '(safe-local-variable-values '((company-clang-arguments "-std=gnu++11")))
+ '(safe-local-variable-values
+   '((projectile-project-run-cmd . "mkdir -p build; cd build; cmake ..; make run")
+     (projectile-project-compilation-cmd . "mkdir -p build; cd build; cmake ..; make")
+     (company-clang-arguments "-std=gnu++11")))
  '(savehist-file "~/.emacs.d/.history")
  '(savehist-mode t)
  '(search-upper-case nil)
  '(send-mail-function 'smtpmail-send-it)
+ '(shell-file-name "bash")
  '(show-paren-mode t)
  '(temporary-file-directory "/tmp")
  '(tool-bar-mode nil)
  '(tooltip-delay 0.2)
  '(tramp-syntax 'default nil (tramp))
  '(truncate-lines t)
+ '(vterm-keymap-exceptions
+   '("C-y" "C-x" "C-u" "C-g" "C-h" "M-x" "M-o" "M-w" "<C-left>" "<C-right>" "<S-left>" "<S-right>" "<S-up>" "<S-down>"))
  '(x-gtk-use-system-tooltips nil)
  '(yas-buffer-local-condition '(looking-at "\\>"))
  '(yas-global-mode t))
@@ -87,7 +116,7 @@
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
- '(default ((t (:inherit nil :stipple nil :background "#181a26" :foreground "gray80" :inverse-video nil :box nil :strike-through nil :overline nil :underline nil :slant normal :weight normal :height 116 :width normal :foundry "pyrs" :family "Roboto Mono"))))
+ '(default ((t (:inherit nil :stipple nil :background "#181a26" :foreground "gray80" :inverse-video nil :box nil :strike-through nil :overline nil :underline nil :slant normal :weight normal :height 116 :width normal :foundry "PfEd" :family "Roboto Mono"))))
  '(company-preview ((t (:foreground "darkgray" :underline t))))
  '(company-preview-common ((t (:inherit company-preview))))
  '(company-scrollbar-bg ((t (:background "dark gray"))))
@@ -107,18 +136,28 @@
  '(line-number-current-line ((t (:inherit line-number :foreground "gray60"))))
  '(link ((t (:slant italic))))
  '(mode-line ((t (:background "dim gray" :foreground "black" :box (:line-width 1 :color "gray40")))))
- '(mode-line-buffer-id ((t (:inherit powerline-active2 :foreground "blue4" :weight bold))))
- '(mode-line-buffer-id-inactive ((t (:inherit powerline-inactive2 :weight bold))))
+ '(mode-line-buffer-id ((t (:inherit powerline-active1 :foreground "gray" :weight bold))))
+ '(mode-line-buffer-id-inactive ((t (:inherit powerline-inactive1 :foreground "#888888" :weight bold))))
  '(mode-line-inactive ((t (:foreground "black" :box (:line-width 1 :color "gray40")))))
  '(parenthesis ((t (:inherit default :foreground "dim gray"))))
- '(powerline-active1 ((t (:inherit mode-line :background "grey17" :foreground "gray"))))
+ '(powerline-active1 ((t (:inherit mode-line :background "grey17" :foreground "#777777"))))
  '(powerline-active2 ((t (:inherit mode-line :background "grey40" :foreground "black"))))
  '(powerline-inactive1 ((t (:inherit mode-line-inactive :background "grey11" :foreground "#666666"))))
- '(show-paren-match ((t (:background "#2f334b")))))
+ '(show-paren-match ((t (:background "#2f334b"))))
+ '(term-color-black ((t (:background "#555753" :foreground "black"))))
+ '(term-color-blue ((t (:background "#739FCF" :foreground "#3465A4"))))
+ '(term-color-cyan ((t (:background "#34E2E2" :foreground "#06989A"))))
+ '(term-color-green ((t (:background "#8AE234" :foreground "#4E9A06"))))
+ '(term-color-magenta ((t (:background "#AD7FA8" :foreground "#75507B"))))
+ '(term-color-red ((t (:background "#EF2929" :foreground "#CC0000"))))
+ '(term-color-white ((t (:background "#EEEEEC" :foreground "#D3D7CF"))))
+ '(term-color-yellow ((t (:background "#FCE94F" :foreground "#C4A000")))))
 
 (package-install-selected-packages)
 
 (load "~/.emacs.d/paths.el")
+
+(require 'vterm)
 
 (if (file-exists-p "secrets.el")
     (load "secrets.el"))
@@ -160,6 +199,7 @@
 (defun recompile-everything ()
   (interactive)
   (byte-recompile-directory "~/.emacs.d" 0 'force))
+
 (defalias 'yes-or-no-p 'y-or-n-p)
 
 (require 'pos-tip)
@@ -184,6 +224,45 @@
                                                ((= (aref line 0) ?-) (propertize  (concat line "\n") 'face 'diff-removed))))) (seq-drop lines 1) "")
                              'diff-added pos))))))))
 
-(use-package server
-  :config
-  (unless (server-running-p) (server-start)))
+(setq-default bidi-display-reordering nil)
+
+(defun my-command-error-function (data context caller)
+  "Ignore the buffer-read-only, beginning-of-buffer,
+end-of-buffer signals; pass the rest to the default handler."
+  (when (not (memq (car data) '(beginning-of-buffer
+                                end-of-buffer)))
+    (command-error-default-function data context caller)))
+
+(setq command-error-function #'my-command-error-function)
+
+;; (setq shell-command-switch "-ic")
+
+(defalias 'agp 'ag-project)
+(put 'dired-find-alternate-file 'disabled nil)
+
+
+(define-key dired-mode-map (kbd "RET") 'dired-find-alternate-file)
+(define-key dired-mode-map (kbd "^") (lambda () (interactive) (find-alternate-file "..")))
+
+(require 'windmove)
+
+(defun swap-buffer-window (direction)
+  "Put the buffer from the selected window in next window, and vice versa"
+  (interactive)
+  (let* ((this (selected-window))
+     (other (windmove-find-other-window direction nil this))
+     (this-buffer (window-buffer this))
+     (that-buffer (window-buffer other)))
+    (set-window-buffer other this-buffer)
+    (set-window-buffer this that-buffer)
+    ;;(tabbar-close-tab) ;;close current tab
+    (select-window other) ;;swap cursor to new buffer
+    ))
+(global-set-key (kbd "<C-S-left>") (lambda () (interactive)
+                                  (swap-buffer-window 'left)))
+(global-set-key (kbd "<C-S-right>") (lambda () (interactive)
+                                      (swap-buffer-window 'right)))
+(global-set-key (kbd "<C-S-up>") (lambda () (interactive)
+                                      (swap-buffer-window 'up)))
+(global-set-key (kbd "<C-S-down>") (lambda () (interactive)
+                                      (swap-buffer-window 'down)))

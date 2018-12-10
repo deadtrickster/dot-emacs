@@ -1,5 +1,4 @@
-(setf show-paren-delay 0
-      show-paren-mode t
+(setf show-paren-mode t
       show-paren-style 'expression)
 
 (show-paren-mode 1)

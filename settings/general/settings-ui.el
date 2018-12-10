@@ -6,8 +6,8 @@
 
 (load-theme 'deeper-blue)
 
-(require 'smooth-scroll)
-(setf smooth-scroll-mode t)
+;; (require 'smooth-scroll)
+;; (setf smooth-scroll-mode t)
 
 (defun figure-out-file-name ()
   (if (equal major-mode 'dired-mode)
@@ -34,16 +34,24 @@
   (let ((filename (figure-out-file-name)))
     (powerline-raw
      (format-mode-line
-      (concat " " (propertize
-                   (format-mode-line mode-line-buffer-identification)
-                   'face face
-                   'mouse-face 'mode-line-highlight
-                   'help-echo (concat filename "\n\ mouse-1: Copy filename\n\ mouse-3: Open directory")
-                   'local-map (let ((map (make-sparse-keymap)))
-                                (define-key map [mode-line mouse-1] 'copy-file-name)
-                                (define-key map [mode-line mouse-3] 'browse-file-directory)
-                                map))))
+      (concat (propertize
+               "%b"
+               'face face
+               'mouse-face 'mode-line-highlight
+               'help-echo (concat filename "\n\ mouse-1: Copy filename\n\ mouse-3: Open directory")
+               'local-map (let ((map (make-sparse-keymap)))
+                            (define-key map [mode-line mouse-1] 'copy-file-name)
+                            (define-key map [mode-line mouse-3] 'browse-file-directory)
+                            map))))
      face pad)))
+
+(defpowerline my-powerline-vc
+  (when (and (buffer-file-name (current-buffer)) vc-mode)
+    (if (and window-system (not powerline-gui-use-vcs-glyph))
+	(format-mode-line '(vc-mode vc-mode))
+      (format "_%s%s"
+	      (char-to-string #xe0a0)
+	      (format-mode-line '(vc-mode vc-mode))))))
 
 (defun powerline-my-theme ()
   "Setup the default mode-line."
@@ -67,19 +75,19 @@
                                  (powerline-raw ": " face2 'l)
                                  (powerline-raw "%3c" face2 'r)
                                  (powerline-raw " " face2)
-                                 (my-powerline-buffer-id mode-line-buffer-id 'l)
                                  (powerline-raw " " face2)))
                           (center
                            (list (funcall separator-right face2 face1)
+                                 (my-powerline-buffer-id mode-line-buffer-id 'l)
                                  (powerline-major-mode face1 'l)
                                  (powerline-process face1)
                                  (powerline-minor-modes face1 'l)
-                                 (powerline-vc face1 'l)
+                                 (my-powerline-vc face1 'l)
                                  (powerline-narrow face1 'l)
                                  (powerline-raw " " face1)
                                  (funcall separator-left face1 face2)))
                           (rhs
-                           (list (powerline-raw "%p" face2 'l)
+                           (list ;; (powerline-raw "%p" face2 'l)
                                  (powerline-raw "   " face2))))
                      (concat (powerline-render lhs)
                              (powerline-fill-center face2 (/ (powerline-width center) 2.0))

@@ -11,6 +11,4 @@
 	(setf packages-fetched t))
       (package-install package))))
 
-(package-initialize)
-
 (provide 'settings-packages)

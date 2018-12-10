@@ -13,3 +13,5 @@
     ad-do-it))
 
 (provide 'mode-isearch)
+
+
