@@ -77,6 +77,9 @@
  '(inhibit-startup-screen t)
  '(initial-buffer-choice nil)
  '(initial-scratch-message nil)
+ '(ivy-mode t)
+ '(ivy-posframe-border-width 2)
+ '(ivy-posframe-parameters '((left-fringe . 10) (right-fringe . 10)))
  '(ivy-wrap t)
  '(make-backup-files t)
  '(menu-bar-mode nil)
@@ -86,7 +89,7 @@
  '(mwheel-tilt-scroll-p t)
  '(next-error-find-buffer-function 'next-error-buffer-on-selected-frame)
  '(package-selected-packages
-   '(ialign neotree ivy-erlang-complete git-commit fontawesome cmake-mode dumb-jump webkit-color-picker company-c-headers flycheck-dialyxir delight pos-tip auto-compile company-erlang company-statistics use-package bind-key fill-column-indicator package-utils dashboard flycheck-color-mode-line makefile-executor git-messenger xterm-color magithub copy-as-format git-timemachine git-link scroll-restore counsel ivy counsel-projectile projectile projectile-variable yatemplate dockerfile-mode ag flycheck-elixir flycheck-credo magit markdown-mode markdown-mode+ markdown-preview-mode markdown-toc yaml-mode elixir-yasnippets alchemist protobuf-mode ac-alchemist iedit ac-php ac-js2 powerline json-mode flycheck-mix sass-mode scss-mode php-mode iedit alchemist web-mode rainbow-mode erlang ac-slime js2-refactor paredit paren-face auto-complete go-autocomplete go-eldoc yasnippet flycheck go-mode highlight-numbers hl-todo))
+   '(doom-themes doom-modeline company-posframe smex ivy-posframe yequake quelpa quelpa-use-package company-irony company-irony-c-headers flycheck-irony irony lsp-ui cquery lsp-css lsp-sh lsp-clangd org-jira ialign neotree ivy-erlang-complete git-commit fontawesome cmake-mode dumb-jump webkit-color-picker company-c-headers flycheck-dialyxir delight pos-tip auto-compile company-erlang company-statistics use-package bind-key fill-column-indicator package-utils dashboard flycheck-color-mode-line makefile-executor git-messenger xterm-color magithub copy-as-format git-timemachine git-link scroll-restore counsel ivy counsel-projectile projectile projectile-variable yatemplate dockerfile-mode ag flycheck-elixir flycheck-credo magit markdown-mode markdown-mode+ markdown-preview-mode markdown-toc yaml-mode elixir-yasnippets alchemist protobuf-mode ac-alchemist iedit ac-php ac-js2 powerline json-mode flycheck-mix sass-mode scss-mode php-mode iedit alchemist web-mode rainbow-mode erlang ac-slime js2-refactor paredit paren-face auto-complete go-autocomplete go-eldoc yasnippet flycheck go-mode highlight-numbers hl-todo))
  '(powerline-default-separator 'wave)
  '(powerline-gui-use-vcs-glyph nil)
  '(projectile-mode t nil (projectile))
@@ -131,6 +134,8 @@
  '(flycheck-error ((t (:background "#553333" :underline (:color "Red1" :style wave)))))
  '(fringe ((t (:background "#181a26"))))
  '(highlight ((t (:underline t))))
+ '(internal-border ((t (:background "dark gray"))))
+ '(ivy-posframe ((t (:inherit default :foreground "#dcdccc"))))
  '(js2-object-property ((t (:inherit default :foreground "goldenrod"))))
  '(line-number ((t (:inherit (shadow default) :foreground "gray34"))))
  '(line-number-current-line ((t (:inherit line-number :foreground "gray60"))))
@@ -250,19 +255,110 @@ end-of-buffer signals; pass the rest to the default handler."
   "Put the buffer from the selected window in next window, and vice versa"
   (interactive)
   (let* ((this (selected-window))
-     (other (windmove-find-other-window direction nil this))
-     (this-buffer (window-buffer this))
-     (that-buffer (window-buffer other)))
+         (other (windmove-find-other-window direction nil this))
+         (this-buffer (window-buffer this))
+         (that-buffer (window-buffer other)))
     (set-window-buffer other this-buffer)
     (set-window-buffer this that-buffer)
     ;;(tabbar-close-tab) ;;close current tab
     (select-window other) ;;swap cursor to new buffer
     ))
 (global-set-key (kbd "<C-S-left>") (lambda () (interactive)
-                                  (swap-buffer-window 'left)))
+                                     (swap-buffer-window 'left)))
 (global-set-key (kbd "<C-S-right>") (lambda () (interactive)
                                       (swap-buffer-window 'right)))
 (global-set-key (kbd "<C-S-up>") (lambda () (interactive)
-                                      (swap-buffer-window 'up)))
+                                   (swap-buffer-window 'up)))
 (global-set-key (kbd "<C-S-down>") (lambda () (interactive)
-                                      (swap-buffer-window 'down)))
+                                     (swap-buffer-window 'down)))
+
+
+;;; https://www.reddit.com/r/emacs/comments/a8l741/message_in_minibuffer_overwrites_prompt/
+(define-advice message (:around (f &rest args) dont-disturb-in-mini)
+  (let ((inhibit-message (or inhibit-message
+                             (> (minibuffer-depth) 0))))
+    (apply f args)))
+
+(require 'quelpa)
+(require 'quelpa-use-package)
+(require 'posframe)
+
+(use-package yequake
+  :quelpa (yequake :fetcher github :repo "alphapapa/yequake"))
+
+(setq yequake-frames
+      '(("__scratch" .
+         ((name . "__scratch")
+          (width . 0.3)
+          (height . 0.5)
+          (alpha . 0.95)
+          (buffer-fns . ("*scratch*"))
+          (frame-parameters . (;(undecorated . t)
+                               (sticky . t)
+                               (unsplittable . t)
+                               (no-other-frame . t)
+                               (minibuffer . nil)
+                               (skip-taskbar . t)
+                               (desktop-dont-save . t)
+                               (window-system . x)))))))
+
+;; (require 'ivy-posframe)
+
+;; (with-eval-after-load 'ivy
+;;   (setq ivy-initial-inputs-alist nil))
+
+;; (setq ivy-display-function nil)
+;; (push '(counsel-M-x . ivy-posframe-display-at-frame-center) ivy-display-functions-alist)
+;; (push '(ido-find-file . ivy-posframe-display-at-window-center) ivy-display-functions-alist)
+;; (push '(counsel-find-file . ivy-posframe-display-at-window-center) ivy-display-functions-alist)
+;; (push '(complete-symbol . ivy-posframe-display-at-point) ivy-display-functions-alist)
+;; (push '(counsel-describe-variable . ivy-posframe-display-at-point) ivy-display-functions-alist)
+;; (push '(describe-variable . ivy-posframe-display-at-point) ivy-display-functions-alist)
+;; (push '(ivy-switch-buffer . ivy-posframe-display-at-window-center) ivy-display-functions-alist)
+;; (push '(t . ivy-posframe-display) ivy-display-functions-alist)
+
+
+;; (global-set-key (kbd "M-x") 'counsel-M-x)
+;; (global-set-key (kbd "C-x b") 'ivy-switch-buffer)
+;; ;; (global-set-key (kbd "C-x C-f") 'counsel-find-file)
+;; ;;
+;; ;;
+;; (ivy-posframe-enable)
+
+;; (defun ivy-posframe--display (str &optional poshandler)
+;;   "Show STR in ivy's posframe."
+;;   (print poshandler)
+;;   (if (not (ivy-posframe-workable-p))
+;;       (ivy-display-function-fallback str)
+;;     (with-selected-window (ivy--get-window ivy-last)
+;;       ;(ignore-errors (kill-buffer ivy-posframe-buffer))
+;;       (with-current-buffer ivy-posframe-buffer
+;;         (goto-char (point-min)))
+;;       (posframe-show
+;;        ivy-posframe-buffer
+;;        :font ivy-posframe-font
+;;        :string
+;;        (with-current-buffer (get-buffer-create " *Minibuf-1*")
+;;          (let ((point (point))
+;;                (string (if ivy-posframe--ignore-prompt
+;;                            str
+;;                          (concat (buffer-string) "  " str))))
+;;            (add-text-properties (- point 1) point '(face ivy-posframe-cursor) string)
+;;            string))
+;;        :position (point)
+;;        :poshandler poshandler
+;;        :background-color (face-attribute 'ivy-posframe :background)
+;;        :foreground-color (face-attribute 'ivy-posframe :foreground)
+;;        :height (or ivy-posframe-height ivy-height)
+;;        :width (if (eq poshandler 'osframe-poshandler-window-bottom-left-corner)
+;;                   (window-width)
+;;                 (or ivy-posframe-width (/ (window-width) 2)))
+;;        :min-height (or ivy-posframe-min-height 10)
+;;        :min-width (or ivy-posframe-min-width 50)
+;;        :internal-border-width ivy-posframe-border-width
+;;        :override-parameters ivy-posframe-parameters))))
+
+;; (use-package company-posframe
+;;   :quelpa (company-posframe :fetcher github :repo "tumashu/company-posframe"))
+;; (require 'company-posframe)
+;; (company-posframe-mode 1)
