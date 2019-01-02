@@ -24,5 +24,6 @@
 (require 'mode-fringe)
 (require 'mode-ivy)
 (require 'mode-term)
+(require 'mode-vterm)
 
 (provide 'settings-modes)

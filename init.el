@@ -77,7 +77,7 @@
  '(inhibit-startup-screen t)
  '(initial-buffer-choice nil)
  '(initial-scratch-message nil)
- '(ivy-mode t)
+ '(ivy-mode nil)
  '(ivy-posframe-border-width 2)
  '(ivy-posframe-parameters '((left-fringe . 10) (right-fringe . 10)))
  '(ivy-wrap t)
@@ -89,7 +89,7 @@
  '(mwheel-tilt-scroll-p t)
  '(next-error-find-buffer-function 'next-error-buffer-on-selected-frame)
  '(package-selected-packages
-   '(doom-themes doom-modeline company-posframe smex ivy-posframe yequake quelpa quelpa-use-package company-irony company-irony-c-headers flycheck-irony irony lsp-ui cquery lsp-css lsp-sh lsp-clangd org-jira ialign neotree ivy-erlang-complete git-commit fontawesome cmake-mode dumb-jump webkit-color-picker company-c-headers flycheck-dialyxir delight pos-tip auto-compile company-erlang company-statistics use-package bind-key fill-column-indicator package-utils dashboard flycheck-color-mode-line makefile-executor git-messenger xterm-color magithub copy-as-format git-timemachine git-link scroll-restore counsel ivy counsel-projectile projectile projectile-variable yatemplate dockerfile-mode ag flycheck-elixir flycheck-credo magit markdown-mode markdown-mode+ markdown-preview-mode markdown-toc yaml-mode elixir-yasnippets alchemist protobuf-mode ac-alchemist iedit ac-php ac-js2 powerline json-mode flycheck-mix sass-mode scss-mode php-mode iedit alchemist web-mode rainbow-mode erlang ac-slime js2-refactor paredit paren-face auto-complete go-autocomplete go-eldoc yasnippet flycheck go-mode highlight-numbers hl-todo))
+   '(pdf-tools shut-up buttercup doom-themes doom-modeline company-posframe smex ivy-posframe yequake quelpa quelpa-use-package company-irony company-irony-c-headers flycheck-irony irony lsp-ui lsp-css lsp-sh org-jira ialign neotree ivy-erlang-complete git-commit fontawesome cmake-mode dumb-jump webkit-color-picker company-c-headers flycheck-dialyxir delight pos-tip auto-compile company-erlang company-statistics use-package bind-key fill-column-indicator package-utils dashboard flycheck-color-mode-line makefile-executor git-messenger xterm-color magithub copy-as-format git-timemachine git-link scroll-restore counsel ivy counsel-projectile projectile projectile-variable yatemplate dockerfile-mode ag flycheck-elixir flycheck-credo magit markdown-mode markdown-mode+ markdown-preview-mode markdown-toc yaml-mode elixir-yasnippets alchemist protobuf-mode ac-alchemist iedit ac-php ac-js2 powerline json-mode flycheck-mix sass-mode scss-mode php-mode iedit alchemist web-mode rainbow-mode erlang ac-slime js2-refactor paredit paren-face auto-complete go-autocomplete go-eldoc yasnippet flycheck go-mode highlight-numbers hl-todo))
  '(powerline-default-separator 'wave)
  '(powerline-gui-use-vcs-glyph nil)
  '(projectile-mode t nil (projectile))
@@ -156,7 +156,15 @@
  '(term-color-magenta ((t (:background "#AD7FA8" :foreground "#75507B"))))
  '(term-color-red ((t (:background "#EF2929" :foreground "#CC0000"))))
  '(term-color-white ((t (:background "#EEEEEC" :foreground "#D3D7CF"))))
- '(term-color-yellow ((t (:background "#FCE94F" :foreground "#C4A000")))))
+ '(term-color-yellow ((t (:background "#FCE94F" :foreground "#C4A000"))))
+ '(vterm-color-black ((t (:inherit term-color-black))))
+ '(vterm-color-blue ((t (:inherit term-color-blue))))
+ '(vterm-color-cyan ((t (:inherit term-color-cyan))))
+ '(vterm-color-green ((t (:inherit term-color-green))))
+ '(vterm-color-magenta ((t (:inherit term-color-magenta))))
+ '(vterm-color-red ((t (:inherit term-color-red))))
+ '(vterm-color-white ((t (:inherit term-color-white))))
+ '(vterm-color-yellow ((t (:inherit term-color-yellow)))))
 
 (package-install-selected-packages)
 
@@ -279,6 +287,7 @@ end-of-buffer signals; pass the rest to the default handler."
                              (> (minibuffer-depth) 0))))
     (apply f args)))
 
+(setq quelpa-checkout-melpa-p nil)
 (require 'quelpa)
 (require 'quelpa-use-package)
 (require 'posframe)

@@ -1,6 +1,5 @@
 (require 'company)
 (company-tng-configure-default)
-(global-company-mode)
 
 (with-eval-after-load 'company
   (setf company-backends '(company-capf company-files (company-dabbrev-code company-gtags company-etags company-keywords) company-dabbrev)

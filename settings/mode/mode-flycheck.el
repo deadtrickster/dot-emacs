@@ -1,5 +1,3 @@
-(global-flycheck-mode)
-
 (define-fringe-bitmap 'flycheck-fringe-bitmap-block
     (vector #b00000000
             #b00000000
