@@ -1,7 +1,7 @@
 ;; (require 'mode-ac)
 (require 'mode-company)
-(require 'mode-web-mode)
-(require 'mode-js2)
+;(require 'mode-web-mode)
+;(require 'mode-js2)
 (require 'mode-erlang)
 (require 'mode-elixir)
 (require 'mode-paren);
@@ -24,5 +24,6 @@
 (require 'mode-fringe)
 (require 'mode-ivy)
 (require 'mode-term)
+(require 'mode-vterm)
 
 (provide 'settings-modes)

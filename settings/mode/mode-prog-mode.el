@@ -4,8 +4,12 @@
 ;(add-hook 'prog-mode-hook 'goto-address-prog-mode)
 ;; Highlight and follow bug references in comments and strings
 ;(add-hook 'prog-mode-hook 'bug-reference-prog-mode)
-(add-hook 'prog-mode-hook 'display-line-numbers-mode)
-(add-hook 'prog-mode-hook 'highlight-numbers-mode)
+(add-hook 'prog-mode-hook (lambda ()
+                            (display-line-numbers-mode)
+                            (highlight-numbers-mode)
+                            (hl-todo-mode)
+                            (yas-minor-mode-on)
+                            (setq-local show-paren-mode t)))
 
 (add-hook 'prog-mode-hook (lambda ()
                             (local-set-key (kbd "RET") (key-binding (kbd "M-j")))))

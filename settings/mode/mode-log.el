@@ -11,7 +11,7 @@
   (setq-local auto-revert-set-timer nil)
   (read-only-mode 1)
   (font-lock-mode 0)
-  (show-paren-mode 0)
+  (setq-local show-paren-mode nil)
   (auto-composition-mode 0)
   (diff-auto-refine-mode 0)
   (diff-hl-flydiff-mode 0)

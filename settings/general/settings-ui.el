@@ -101,6 +101,12 @@
       '(buffer-file-name "%f"
                          (dired-directory dired-directory "%b")))
 
+
+(show-paren-mode)
+
+(add-hook 'minibuffer-setup-hook (lambda ()
+                                   (setq-local show-paren-mode nil)))
+
 (provide 'settings-ui)
 
 ;;; settings-ui.el ends here

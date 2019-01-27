@@ -8,8 +8,6 @@
 (auto-compile-on-load-mode)
 (auto-compile-on-save-mode)
 
-(add-to-list 'load-path "/home/dead/Projects/emacs-libvterm")
-
 (custom-set-variables
  ;; custom-set-variables was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
@@ -20,7 +18,7 @@
  '(alchemist-test-status-modeline nil)
  '(ansi-color-names-vector
    [("black" . "#555753")
-    ("#CC0000" . "#EF2929")
+    ("#CC0000" . "#ef2929")
     ("#4E9A06" . "#8AE234")
     ("#C4A000" . "#FCE94F")
     ("#3465A4" . "#739FCF")
@@ -51,6 +49,7 @@
  '(company-tooltip-minimum-width 60)
  '(counsel-ag-base-command "ag --nocolor --nogroup %s")
  '(create-lockfiles nil)
+ '(delete-selection-mode t)
  '(display-line-numbers-grow-only t)
  '(display-line-numbers-width-start t)
  '(doc-view-continuous t)
@@ -69,18 +68,20 @@
  '(gc-cons-threshold 1600000)
  '(git-messenger:show-detail t)
  '(git-messenger:use-magit-popup nil)
- '(global-hl-todo-mode t)
+ '(global-flycheck-mode nil)
  '(hscroll-margin 1)
  '(hscroll-step 1)
+ '(ido-enable-flex-matching t)
  '(indent-tabs-mode nil)
  '(inhibit-startup-echo-area-message "dead")
  '(inhibit-startup-screen t)
  '(initial-buffer-choice nil)
  '(initial-scratch-message nil)
- '(ivy-mode t)
+ '(ivy-mode nil)
  '(ivy-posframe-border-width 2)
  '(ivy-posframe-parameters '((left-fringe . 10) (right-fringe . 10)))
  '(ivy-wrap t)
+ '(lsp-clients-elixir-server-executable "/home/dead/bin/elixirls/language_server.sh")
  '(make-backup-files t)
  '(menu-bar-mode nil)
  '(mouse-1-click-follows-link -150)
@@ -89,11 +90,12 @@
  '(mwheel-tilt-scroll-p t)
  '(next-error-find-buffer-function 'next-error-buffer-on-selected-frame)
  '(package-selected-packages
-   '(doom-themes doom-modeline company-posframe smex ivy-posframe yequake quelpa quelpa-use-package company-irony company-irony-c-headers flycheck-irony irony lsp-ui cquery lsp-css lsp-sh lsp-clangd org-jira ialign neotree ivy-erlang-complete git-commit fontawesome cmake-mode dumb-jump webkit-color-picker company-c-headers flycheck-dialyxir delight pos-tip auto-compile company-erlang company-statistics use-package bind-key fill-column-indicator package-utils dashboard flycheck-color-mode-line makefile-executor git-messenger xterm-color magithub copy-as-format git-timemachine git-link scroll-restore counsel ivy counsel-projectile projectile projectile-variable yatemplate dockerfile-mode ag flycheck-elixir flycheck-credo magit markdown-mode markdown-mode+ markdown-preview-mode markdown-toc yaml-mode elixir-yasnippets alchemist protobuf-mode ac-alchemist iedit ac-php ac-js2 powerline json-mode flycheck-mix sass-mode scss-mode php-mode iedit alchemist web-mode rainbow-mode erlang ac-slime js2-refactor paredit paren-face auto-complete go-autocomplete go-eldoc yasnippet flycheck go-mode highlight-numbers hl-todo))
+   '(term-projectile shell-pop flycheck-inline doom-themes doom-modeline company-posframe smex ivy-posframe yequake quelpa quelpa-use-package company-irony company-irony-c-headers flycheck-irony irony lsp-ui cquery lsp-css lsp-sh lsp-clangd org-jira ialign neotree ivy-erlang-complete git-commit fontawesome cmake-mode dumb-jump webkit-color-picker company-c-headers flycheck-dialyxir delight pos-tip auto-compile company-erlang company-statistics use-package bind-key fill-column-indicator package-utils dashboard flycheck-color-mode-line makefile-executor git-messenger xterm-color magithub copy-as-format git-timemachine git-link scroll-restore counsel ivy counsel-projectile projectile projectile-variable yatemplate dockerfile-mode ag flycheck-elixir flycheck-credo magit markdown-mode markdown-mode+ markdown-preview-mode markdown-toc yaml-mode elixir-yasnippets alchemist protobuf-mode ac-alchemist iedit ac-php ac-js2 powerline json-mode flycheck-mix sass-mode scss-mode php-mode iedit alchemist web-mode rainbow-mode erlang ac-slime js2-refactor paredit paren-face auto-complete go-autocomplete go-eldoc yasnippet flycheck go-mode highlight-numbers hl-todo))
  '(powerline-default-separator 'wave)
  '(powerline-gui-use-vcs-glyph nil)
  '(projectile-mode t nil (projectile))
  '(projectile-mode-line '(:eval (format " [%s]" (projectile-project-name))))
+ '(quelpa-checkout-melpa-p nil)
  '(safe-local-variable-values
    '((projectile-project-run-cmd . "mkdir -p build; cd build; cmake ..; make run")
      (projectile-project-compilation-cmd . "mkdir -p build; cd build; cmake ..; make")
@@ -103,7 +105,7 @@
  '(search-upper-case nil)
  '(send-mail-function 'smtpmail-send-it)
  '(shell-file-name "bash")
- '(show-paren-mode t)
+ '(show-paren-style 'expression)
  '(temporary-file-directory "/tmp")
  '(tool-bar-mode nil)
  '(tooltip-delay 0.2)
@@ -112,8 +114,7 @@
  '(vterm-keymap-exceptions
    '("C-y" "C-x" "C-u" "C-g" "C-h" "M-x" "M-o" "M-w" "<C-left>" "<C-right>" "<S-left>" "<S-right>" "<S-up>" "<S-down>"))
  '(x-gtk-use-system-tooltips nil)
- '(yas-buffer-local-condition '(looking-at "\\>"))
- '(yas-global-mode t))
+ '(yas-buffer-local-condition '(looking-at "\\>")))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
@@ -156,18 +157,56 @@
  '(term-color-magenta ((t (:background "#AD7FA8" :foreground "#75507B"))))
  '(term-color-red ((t (:background "#EF2929" :foreground "#CC0000"))))
  '(term-color-white ((t (:background "#EEEEEC" :foreground "#D3D7CF"))))
- '(term-color-yellow ((t (:background "#FCE94F" :foreground "#C4A000")))))
+ '(term-color-yellow ((t (:background "#FCE94F" :foreground "#C4A000"))))
+ '(vterm-color-black ((t (:inherit term-color-black))))
+ '(vterm-color-black-bg ((t (:background "#555753"))))
+ '(vterm-color-blue ((t (:inherit term-color-blue))))
+ '(vterm-color-blue-bg ((t (:background "#739FCF"))))
+ '(vterm-color-blue-fg ((t (:foreground "#3465A4"))))
+ '(vterm-color-cyan ((t (:inherit term-color-cyan))))
+ '(vterm-color-cyan-bg ((t (:background "#34E2E2"))))
+ '(vterm-color-cyan-fg ((t (:foreground "#06989A"))))
+ '(vterm-color-default-bg ((t (:background "#181a26"))))
+ '(vterm-color-green ((t (:inherit term-color-green))))
+ '(vterm-color-green-bg ((t (:background "#8AE234"))))
+ '(vterm-color-green-fg ((t (:foreground "#4E9A06"))))
+ '(vterm-color-magenta ((t (:inherit term-color-magenta))))
+ '(vterm-color-magenta-bg ((t (:foreground "#AD7FA8"))))
+ '(vterm-color-magenta-fg ((t (:foreground "#75507B"))))
+ '(vterm-color-red ((t (:inherit term-color-red))))
+ '(vterm-color-red-bg ((t (:background "#EF2929"))))
+ '(vterm-color-red-fg ((t (:foreground "#CC0000"))))
+ '(vterm-color-white ((t (:inherit term-color-white))))
+ '(vterm-color-white-bg ((t (:background "#EEEEEC"))))
+ '(vterm-color-white-fg ((t (:foreground "#D3D7CF"))))
+ '(vterm-color-yellow ((t (:inherit term-color-yellow))))
+ '(vterm-color-yellow-bg ((t (:background "#FCE94F"))))
+ '(vterm-color-yellow-fg ((t (:foreground "#C4A000")))))
 
 (package-install-selected-packages)
 
 (load "~/.emacs.d/paths.el")
 
-(require 'vterm)
-
 (if (file-exists-p "secrets.el")
     (load "secrets.el"))
 
 (require 'settings)
+(defun turn-on-fci-mode ())
+(defun recompile-everything ()
+  (interactive)
+  (byte-recompile-directory "~/.emacs.d" 0 'force))
+
+(setq-default bidi-display-reordering nil)
+
+(defun my-command-error-function (data context caller)
+  "Ignore the buffer-read-only, beginning-of-buffer,
+end-of-buffer signals; pass the rest to the default handler."
+  (when (not (memq (car data) '(beginning-of-buffer
+                                end-of-buffer)))
+    (command-error-default-function data context caller)))
+
+(setq command-error-function #'my-command-error-function)
+
 
 ;;;; $ cat ~/.config/systemd/user/default.target.wants/emacs.service
 ;; [Unit]
@@ -200,107 +239,32 @@
 ;;;; Ramdisk for /tmp
 ;; tmpfs    /tmp            tmpfs defaults,noatime,nosuid,nodev,noexec,mode=1777,size=512M  0 0
 ;;;;
-(defun turn-on-fci-mode ())
-(defun recompile-everything ()
-  (interactive)
-  (byte-recompile-directory "~/.emacs.d" 0 'force))
-
-(defalias 'yes-or-no-p 'y-or-n-p)
-
-(require 'pos-tip)
-
-(global-set-key (kbd "<left-fringe> <mouse-1>")
-                (lambda (ev)
-                  (interactive "e")
-                  (let* ((pos (posn-point (event-start ev)))
-                         (overlay (car (overlays-at pos))))
-                    (when overlay
-                      (let* ((diff-type (overlay-get overlay 'diff-type))
-                             (diff-content (overlay-get overlay 'diff-content)))
-                        (when (and diff-content
-                                   (or (eq diff-type 'change)
-                                       (eq diff-type 'delete)))
-                          (let ((lines (split-string diff-content "[\n\r]+" )))
-                            (pos-tip-show-no-propertize
-                             (mapconcat (lambda (line)
-                                          (if (> (length line) 1)
-                                              (cond
-                                               ((= (aref line 0) ?+) (propertize (concat line "\n") 'face 'diff-added))
-                                               ((= (aref line 0) ?-) (propertize  (concat line "\n") 'face 'diff-removed))))) (seq-drop lines 1) "")
-                             'diff-added pos))))))))
-
-(setq-default bidi-display-reordering nil)
-
-(defun my-command-error-function (data context caller)
-  "Ignore the buffer-read-only, beginning-of-buffer,
-end-of-buffer signals; pass the rest to the default handler."
-  (when (not (memq (car data) '(beginning-of-buffer
-                                end-of-buffer)))
-    (command-error-default-function data context caller)))
-
-(setq command-error-function #'my-command-error-function)
 
 ;; (setq shell-command-switch "-ic")
 
-(defalias 'agp 'ag-project)
-(put 'dired-find-alternate-file 'disabled nil)
 
+;; (require 'quelpa)
+;; (require 'quelpa-use-package)
+;; (require 'posframe)
 
-(define-key dired-mode-map (kbd "RET") 'dired-find-alternate-file)
-(define-key dired-mode-map (kbd "^") (lambda () (interactive) (find-alternate-file "..")))
+;; (use-package yequake
+;;   :quelpa (yequake :fetcher github :repo "alphapapa/yequake"))
 
-(require 'windmove)
-
-(defun swap-buffer-window (direction)
-  "Put the buffer from the selected window in next window, and vice versa"
-  (interactive)
-  (let* ((this (selected-window))
-         (other (windmove-find-other-window direction nil this))
-         (this-buffer (window-buffer this))
-         (that-buffer (window-buffer other)))
-    (set-window-buffer other this-buffer)
-    (set-window-buffer this that-buffer)
-    ;;(tabbar-close-tab) ;;close current tab
-    (select-window other) ;;swap cursor to new buffer
-    ))
-(global-set-key (kbd "<C-S-left>") (lambda () (interactive)
-                                     (swap-buffer-window 'left)))
-(global-set-key (kbd "<C-S-right>") (lambda () (interactive)
-                                      (swap-buffer-window 'right)))
-(global-set-key (kbd "<C-S-up>") (lambda () (interactive)
-                                   (swap-buffer-window 'up)))
-(global-set-key (kbd "<C-S-down>") (lambda () (interactive)
-                                     (swap-buffer-window 'down)))
-
-
-;;; https://www.reddit.com/r/emacs/comments/a8l741/message_in_minibuffer_overwrites_prompt/
-(define-advice message (:around (f &rest args) dont-disturb-in-mini)
-  (let ((inhibit-message (or inhibit-message
-                             (> (minibuffer-depth) 0))))
-    (apply f args)))
-
-(require 'quelpa)
-(require 'quelpa-use-package)
-(require 'posframe)
-
-(use-package yequake
-  :quelpa (yequake :fetcher github :repo "alphapapa/yequake"))
-
-(setq yequake-frames
-      '(("__scratch" .
-         ((name . "__scratch")
-          (width . 0.3)
-          (height . 0.5)
-          (alpha . 0.95)
-          (buffer-fns . ("*scratch*"))
-          (frame-parameters . (;(undecorated . t)
-                               (sticky . t)
-                               (unsplittable . t)
-                               (no-other-frame . t)
-                               (minibuffer . nil)
-                               (skip-taskbar . t)
-                               (desktop-dont-save . t)
-                               (window-system . x)))))))
+;; (setq yequake-frames
+;;       '(("__scratch" .
+;;          ((name . "__scratch")
+;;           (width . 0.3)
+;;           (height . 0.5)
+;;           (alpha . 0.95)
+;;           (buffer-fns . ("*scratch*"))
+;;           (frame-parameters . (;(undecorated . t)
+;;                                (sticky . t)
+;;                                (unsplittable . t)
+;;                                (no-other-frame . t)
+;;                                (minibuffer . nil)
+;;                                (skip-taskbar . t)
+;;                                (desktop-dont-save . t)
+;;                                (window-system . x)))))))
 
 ;; (require 'ivy-posframe)
 

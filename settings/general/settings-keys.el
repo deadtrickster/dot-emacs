@@ -1,3 +1,6 @@
+
+(require 'windmove)
+
 (global-set-key (kbd "C-z") 'undo)
 (global-set-key "\C-cc" 'comment-or-uncomment-region)
 (global-set-key "\C-cd" 'delete-window)
@@ -5,6 +8,27 @@
 (global-set-key [S-down] 'windmove-down)
 (global-set-key [S-left] 'windmove-left)
 (global-set-key [S-up] 'windmove-up)
+
+(defun swap-buffer-window (direction)
+  "Put the buffer from the selected window in next window, and vice versa"
+  (interactive)
+  (let* ((this (selected-window))
+         (other (windmove-find-other-window direction nil this))
+         (this-buffer (window-buffer this))
+         (that-buffer (window-buffer other)))
+    (set-window-buffer other this-buffer)
+    (set-window-buffer this that-buffer)
+    ;;(tabbar-close-tab) ;;close current tab
+    (select-window other) ;;swap cursor to new buffer
+    ))
+(global-set-key (kbd "<C-S-left>") (lambda () (interactive)
+                                     (swap-buffer-window 'left)))
+(global-set-key (kbd "<C-S-right>") (lambda () (interactive)
+                                      (swap-buffer-window 'right)))
+(global-set-key (kbd "<C-S-up>") (lambda () (interactive)
+                                   (swap-buffer-window 'up)))
+(global-set-key (kbd "<C-S-down>") (lambda () (interactive)
+                                     (swap-buffer-window 'down)))
 (global-set-key [next]
                 (lambda () (interactive)
                   (condition-case nil (scroll-up)
