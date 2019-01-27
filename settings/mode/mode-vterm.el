@@ -26,12 +26,18 @@
 
 (add-hook 'vterm-mode-hook (lambda ()
                              (setf truncate-lines nil)
-                             (setq-local show-paren-mode nil)))
+                             (setq-local show-paren-mode nil)
+                             (yas-minor-mode -1)
+                             (flycheck-mode -1)))
 
 (defun vterm--rename-buffer-as-title (title)
   (let ((dir (concat (nth 1 (split-string title ":")) "/")))
     (cd dir))
   (rename-buffer (format "term %s" title)))
+
 (add-hook 'vterm-set-title-functions 'vterm--rename-buffer-as-title)
+
+(define-key vterm-mode-map [?\C-c] )
+(define-key vterm-mode-map (kbd "C-c C-c") 'vterm--self-insert)
 
 (provide 'mode-vterm)
