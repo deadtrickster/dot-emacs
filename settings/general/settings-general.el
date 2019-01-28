@@ -11,7 +11,6 @@ http://emacsredux.com/blog/2013/05/18/instant-access-to-init-dot-el/"
 (require 'settings-delight)
 (require 'settings-neotree)
 (require 'settings-ffap)
-(require 'settings-shell-pop)
 (require 'settings-aliases)
 
 (provide 'settings-general)

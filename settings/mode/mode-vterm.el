@@ -37,7 +37,7 @@
 
 (add-hook 'vterm-set-title-functions 'vterm--rename-buffer-as-title)
 
-(define-key vterm-mode-map [?\C-c] )
-(define-key vterm-mode-map (kbd "C-c C-c") 'vterm--self-insert)
+(define-key vterm-mode-map [?\C-c] nil)
+(define-key vterm-mode-map [?\C-c ?\C-c] 'vterm--self-insert)
 
 (provide 'mode-vterm)
