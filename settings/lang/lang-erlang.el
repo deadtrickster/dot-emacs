@@ -14,7 +14,7 @@
 (setq  erlang-indent-level 2)
 
 (require 'ivy-erlang-complete)
-(add-hook 'erlang-mode-hook #'ivy-erlang-complete-init)
+(add-hook 'erlang-mode-hook (lambda () (ignore-errors (ivy-erlang-complete-init))))
 ;; automatic update completion data after save
 (add-hook 'after-save-hook #'ivy-erlang-complete-reparse)
 

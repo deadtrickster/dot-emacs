@@ -18,8 +18,11 @@
                              (hl-todo-mode nil)
                              (file-name-shadow-mode 0)
                              (yas-minor-mode 0)
-                             (paren-face-mode 0)                             
+                             (paren-face-mode 0)
+                             (setq-local font-lock-keywords-only t)
                              (setq-local show-paren-mode nil)))
+
+(define-key vterm-mode-map [delete] #'vterm--self-insert)
 
 (defun vterm--rename-buffer-as-title (title)
   (let ((dir (concat (nth 1 (split-string title ":")) "/")))
@@ -28,4 +31,5 @@
 (add-hook 'vterm-set-title-functions 'vterm--rename-buffer-as-title)
 
 (provide 'mode-vterm)
-
+ 
+ 

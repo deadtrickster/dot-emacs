@@ -89,7 +89,7 @@
  '(mwheel-tilt-scroll-p t)
  '(next-error-find-buffer-function 'next-error-buffer-on-selected-frame)
  '(package-selected-packages
-   '(pdf-tools shut-up buttercup doom-themes doom-modeline company-posframe smex ivy-posframe yequake quelpa quelpa-use-package company-irony company-irony-c-headers flycheck-irony irony lsp-ui lsp-css lsp-sh org-jira ialign neotree ivy-erlang-complete git-commit fontawesome cmake-mode dumb-jump webkit-color-picker company-c-headers flycheck-dialyxir delight pos-tip auto-compile company-erlang company-statistics use-package bind-key fill-column-indicator package-utils dashboard flycheck-color-mode-line makefile-executor git-messenger xterm-color magithub copy-as-format git-timemachine git-link scroll-restore counsel ivy counsel-projectile projectile projectile-variable yatemplate dockerfile-mode ag flycheck-elixir flycheck-credo magit markdown-mode markdown-mode+ markdown-preview-mode markdown-toc yaml-mode elixir-yasnippets alchemist protobuf-mode ac-alchemist iedit ac-php ac-js2 powerline json-mode flycheck-mix sass-mode scss-mode php-mode iedit alchemist web-mode rainbow-mode erlang ac-slime js2-refactor paredit paren-face auto-complete go-autocomplete go-eldoc yasnippet flycheck go-mode highlight-numbers hl-todo))
+   '(shackle zoom pdf-tools shut-up buttercup doom-themes doom-modeline company-posframe smex ivy-posframe yequake quelpa quelpa-use-package company-irony company-irony-c-headers flycheck-irony irony lsp-ui lsp-css lsp-sh org-jira ialign neotree ivy-erlang-complete git-commit fontawesome cmake-mode dumb-jump webkit-color-picker company-c-headers flycheck-dialyxir delight pos-tip auto-compile company-erlang company-statistics use-package bind-key fill-column-indicator package-utils dashboard flycheck-color-mode-line makefile-executor git-messenger xterm-color magithub copy-as-format git-timemachine git-link scroll-restore counsel ivy counsel-projectile projectile projectile-variable yatemplate dockerfile-mode ag flycheck-elixir flycheck-credo magit markdown-mode markdown-mode+ markdown-preview-mode markdown-toc yaml-mode elixir-yasnippets alchemist protobuf-mode ac-alchemist iedit ac-php ac-js2 powerline json-mode flycheck-mix sass-mode scss-mode php-mode iedit alchemist web-mode rainbow-mode erlang ac-slime js2-refactor paredit paren-face auto-complete go-autocomplete go-eldoc yasnippet flycheck go-mode highlight-numbers hl-todo))
  '(powerline-default-separator 'wave)
  '(powerline-gui-use-vcs-glyph nil)
  '(projectile-mode t nil (projectile))
@@ -237,6 +237,17 @@
                                                ((= (aref line 0) ?-) (propertize  (concat line "\n") 'face 'diff-removed))))) (seq-drop lines 1) "")
                              'diff-added pos))))))))
 
+(global-set-key (kbd "<left-fringe> <mouse-3>")
+                (lambda (ev)
+                  (interactive "e")
+                  (let* ((pos (posn-point (event-start ev)))
+                         (overlay (car (overlays-at pos))))
+                    (when overlay
+                      (let* ((diff-type (overlay-get overlay 'diff-type))
+                             (diff-content (overlay-get overlay 'diff-content)))
+                        (when diff-content
+                          (diff-hl-revert-hunk)))))))
+
 (setq-default bidi-display-reordering nil)
 
 (defun my-command-error-function (data context caller)
@@ -371,3 +382,6 @@ end-of-buffer signals; pass the rest to the default handler."
 ;;   :quelpa (company-posframe :fetcher github :repo "tumashu/company-posframe"))
 ;; (require 'company-posframe)
 ;; (company-posframe-mode 1)
+
+(require 'server)
+(unless (server-running-p) (server-start))

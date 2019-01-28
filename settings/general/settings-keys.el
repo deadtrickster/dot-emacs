@@ -14,9 +14,9 @@
                   (condition-case nil (scroll-down)
                     (beginning-of-buffer (goto-char (point-min))))))
 
-(global-set-key "\C-b" (lambda ()
-                         (interactive)
-                         (switch-to-buffer "*Ibuffer*")))
+;; (global-set-key "\C-b" (lambda ()
+;;                          (interactive)
+;;                          (switch-to-buffer "*Ibuffer*")))
 
 (global-set-key [C-left] 'previous-buffer)
 (global-set-key [C-right] 'next-buffer)
