@@ -39,5 +39,6 @@
 
 (define-key vterm-mode-map [?\C-c] nil)
 (define-key vterm-mode-map [?\C-c ?\C-c] 'vterm--self-insert)
+(define-key vterm-mode-map [delete] #'vterm--self-insert)
 
 (provide 'mode-vterm)
