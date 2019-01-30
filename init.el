@@ -167,6 +167,7 @@
  '(vterm-color-cyan-bg ((t (:background "#34E2E2"))))
  '(vterm-color-cyan-fg ((t (:foreground "#06989A"))))
  '(vterm-color-default-bg ((t (:background "#181a26"))))
+ '(vterm-color-default-fg ((t (:foreground "gray80"))))
  '(vterm-color-green ((t (:inherit term-color-green))))
  '(vterm-color-green-bg ((t (:background "#8AE234"))))
  '(vterm-color-green-fg ((t (:foreground "#4E9A06"))))
