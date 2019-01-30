@@ -18,7 +18,7 @@
  '(alchemist-test-status-modeline nil)
  '(ansi-color-names-vector
    [("black" . "#555753")
-    ("#CC0000" . "#ef2929")
+    ("#CC0000" . "#EF2929")
     ("#4E9A06" . "#8AE234")
     ("#C4A000" . "#FCE94F")
     ("#3465A4" . "#739FCF")
