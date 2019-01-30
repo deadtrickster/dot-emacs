@@ -12,5 +12,6 @@ http://emacsredux.com/blog/2013/05/18/instant-access-to-init-dot-el/"
 (require 'settings-neotree)
 (require 'settings-ffap)
 (require 'settings-aliases)
+(require 'settings-messages)
 
 (provide 'settings-general)

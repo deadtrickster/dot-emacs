@@ -11,8 +11,9 @@
 
 (require 'cl-extra)
 
-(defcustom  message-filter-regexp-list '("^Starting new Ispell process \\[.+\\] \\.\\.\\.$"
-                                         "^Ispell process killed$")
+(defcustom message-filter-regexp-list '("^Starting new Ispell process \\[.+\\] \\.\\.\\.$"
+                                        "^Ispell process killed$"
+                                        "Wrote *recentf")
   "filter formatted message string to remove noisy messages"
   :type '(list string)
   :group 'general)
@@ -42,3 +43,5 @@
       (progn
         (ad-set-args 0 `("%s" ,formatted-string))
         ad-do-it))))
+
+(provide 'settings-messages)
