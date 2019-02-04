@@ -13,7 +13,7 @@
 
 (defcustom message-filter-regexp-list '("^Starting new Ispell process \\[.+\\] \\.\\.\\.$"
                                         "^Ispell process killed$"
-                                        "Wrote *recentf")
+                                        "Wrote ")
   "filter formatted message string to remove noisy messages"
   :type '(list string)
   :group 'general)
@@ -33,15 +33,16 @@
           ad-do-it)))))
 
 (defadvice print (around print-filter-by-regexp activate)
-  (let ((formatted-string (ad-get-args 0)))
-    (if (and (stringp formatted-string)
-             (cl-some (lambda (re) (string-match re formatted-string)) message-filter-regexp-list))
+  (let ((string (ad-get-args 0)))
+    (if (and (stringp string)
+             (cl-some (lambda (re) (string-match re string)) message-filter-regexp-list))
         (let ((inhibit-read-only t))
           (with-current-buffer "*Messages*"
             (goto-char (point-max))
-            (insert formatted-string "\n")))
+            (insert string "\n")))
       (progn
-        (ad-set-args 0 `("%s" ,formatted-string))
         ad-do-it))))
+
+(setf save-silently t)
 
 (provide 'settings-messages)
