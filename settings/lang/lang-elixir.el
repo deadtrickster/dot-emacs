@@ -29,4 +29,7 @@
                                   (setq mixfmt-args (list "--dot-formatter" (concat (projectile-project-root) "/.formatter.exs")))
                                 (setq mixfmt-args nil))))
 
+
+(add-to-list 'auto-mode-alist '("mix.lock" . elixir-mode))
+
 (provide 'lang-elixir)

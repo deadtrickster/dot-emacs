@@ -3,6 +3,38 @@
 (require 'use-package)
 (require 'bind-key)
 
+(defun dashboard-insert-workspaces-list (list-display-name list)
+  "Render LIST-DISPLAY-NAME title and project items of LIST."
+  (when (car list)
+    (dashboard-insert-heading list-display-name)
+    (mapc (lambda (w)
+            (insert "\n    ")
+            (widget-create 'push-button
+                           :action `(lambda (&rest ignore)
+                                      (treemacs)
+				      (setf (treemacs-current-workspace) ,w))
+                           :mouse-face 'highlight
+                           :follow-link "\C-m"
+                           :button-prefix ""
+                           :button-suffix ""
+                           :format "%[%t%]"
+                           (abbreviate-file-name (treemacs-workspace->name w))))
+          list)))
+
+(defun dashboard-insert-workspaces (list-size)
+  "Add the list of LIST-SIZE items of workspaces."
+  ;; For some reason, projectile has to be loaded here
+  ;; before trying to load projects list
+  (require 'treemacs)
+  (if (bound-and-true-p projectile-mode)
+      (progn
+	(when (dashboard-insert-workspaces-list
+	       "Workspaces:"
+	       (dashboard-subseq (treemacs-workspaces)
+				 0 list-size))
+	  (dashboard-insert-shortcut "p" "Workspaces:")))
+    (message "Failed to load workspaces list")))
+
 (use-package dashboard
   :bind (:map dashboard-mode-map
 	      ("<down-mouse-1>" . (lambda () (interactive)))
@@ -10,8 +42,16 @@
 	      ("<mouse-1>" . widget-button-click)
 	      ("<mouse-2>" . widget-button-click))
   :config
+
+  (setq dashboard-item-generators  '((recents    . dashboard-insert-recents)
+                                     (bookmarks  . dashboard-insert-bookmarks)
+                                     (projects   . dashboard-insert-projects)
+                                     (workspaces . dashboard-insert-workspaces)
+                                     (agenda     . dashboard-insert-agenda)
+                                     (registers  . dashboard-insert-registers)))
   (setq dashboard-startup-banner 'official)
   (setq dashboard-items '((recents  . 20)
+			  (workspaces . 20)
 			  (bookmarks . 20)))
   (dashboard-setup-startup-hook))
 
@@ -58,6 +98,7 @@
 (add-to-list 'recentf-exclude "\\.emacs\\.d/bookmarks")
 (add-to-list 'recentf-exclude "\\.emacs\\.d/recentf")
 (add-to-list 'recentf-exclude "\\.emacs\\.d/ido.last")
+(add-to-list 'recentf-exclude "\\.emacs\\.d/\\.cache/treemacs-persist")
 
 (run-at-time nil (* 5 60) 'recentf-save-list)
 

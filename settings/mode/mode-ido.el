@@ -3,6 +3,8 @@
 (ido-mode t)
 (ido-everywhere 1)
 
+(defvar ido-directory-too-big nil)
+
 ;; (defun ido-name (item)
 ;;   ;; Return file name for current item, whether in a normal list
 ;;   ;; or a merged work directory list.
@@ -25,12 +27,24 @@
              (not (file-writable-p buffer-file-name)))
     (find-alternate-file (concat "/sudo:root@localhost:" buffer-file-name))))
 
+(defvar ido-dont-ignore-buffer-names '("*scratch*" "*dashboard*" "*Messages*"))
+
+(defun ido-ignore-most-star-buffers (name)
+  (and
+   (or (string-match-p "\\`\\**\\*" name))
+   (not (member name ido-dont-ignore-buffer-names))))
+
+(setq ido-ignore-buffers (list "\\` "  #'ido-ignore-most-star-buffers))
+
+
 ;; (add-hook 'find-file-hook
 ;;        (lambda ()
 ;;          "Find file as root if necessary."
 ;;          (unless (and buffer-file-name
 ;;                       (file-writable-p buffer-file-name))
 ;;            (find-alternate-file (concat "/sudo:root@localhost:" buffer-file-name)))))
+;;
+ (rx (or (and "\*" (*? anything) "*/") (and "//" (*? anything) eol)))
 
 (provide 'mode-ido)
 
