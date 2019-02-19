@@ -31,10 +31,10 @@
 
 (defun ido-ignore-most-star-buffers (name)
   (and
-   (or (string-match-p "\\`\\**\\*" name))
+   (string-match-p "^\\*.*\\*" name)
    (not (member name ido-dont-ignore-buffer-names))))
 
-(setq ido-ignore-buffers (list "\\` "  #'ido-ignore-most-star-buffers))
+(setq ido-ignore-buffers (list "\\^ .*"  #'ido-ignore-most-star-buffers))
 
 
 ;; (add-hook 'find-file-hook

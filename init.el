@@ -71,7 +71,9 @@
  '(global-flycheck-mode nil)
  '(hscroll-margin 1)
  '(hscroll-step 1)
+ '(ido-case-fold t)
  '(ido-enable-flex-matching t)
+ '(ido-max-window-height 1)
  '(indent-tabs-mode nil)
  '(inhibit-startup-echo-area-message "dead")
  '(inhibit-startup-screen t)
@@ -90,7 +92,7 @@
  '(mwheel-tilt-scroll-p t)
  '(next-error-find-buffer-function 'next-error-buffer-on-selected-frame)
  '(package-selected-packages
-   '(all-the-icons-ivy treemacs treemacs-icons-dired treemacs-magit treemacs-projectile hydra term-projectile plantuml-mode term-projectile shell-pop flycheck-inline doom-themes doom-modeline company-posframe smex ivy-posframe yequake quelpa quelpa-use-package company-irony company-irony-c-headers flycheck-irony irony lsp-ui cquery lsp-css lsp-sh lsp-clangd org-jira ialign neotree ivy-erlang-complete git-commit fontawesome cmake-mode dumb-jump webkit-color-picker company-c-headers flycheck-dialyxir delight pos-tip auto-compile company-erlang company-statistics use-package bind-key fill-column-indicator package-utils dashboard flycheck-color-mode-line makefile-executor git-messenger xterm-color magithub copy-as-format git-timemachine git-link scroll-restore counsel ivy counsel-projectile projectile projectile-variable yatemplate dockerfile-mode ag flycheck-elixir flycheck-credo magit markdown-mode markdown-mode+ markdown-preview-mode markdown-toc yaml-mode elixir-yasnippets alchemist protobuf-mode ac-alchemist iedit ac-php ac-js2 powerline json-mode flycheck-mix sass-mode scss-mode php-mode iedit alchemist web-mode rainbow-mode erlang ac-slime js2-refactor paredit paren-face auto-complete go-autocomplete go-eldoc yasnippet flycheck go-mode highlight-numbers hl-todo))
+   '(magit-popup all-the-icons-ivy treemacs treemacs-icons-dired treemacs-magit treemacs-projectile hydra term-projectile plantuml-mode term-projectile shell-pop flycheck-inline doom-themes doom-modeline company-posframe smex ivy-posframe yequake quelpa quelpa-use-package company-irony company-irony-c-headers flycheck-irony irony lsp-ui cquery lsp-css lsp-sh lsp-clangd org-jira ialign neotree ivy-erlang-complete git-commit fontawesome cmake-mode dumb-jump webkit-color-picker company-c-headers flycheck-dialyxir delight pos-tip auto-compile company-erlang company-statistics use-package bind-key fill-column-indicator package-utils dashboard flycheck-color-mode-line makefile-executor git-messenger xterm-color magithub copy-as-format git-timemachine git-link scroll-restore counsel ivy counsel-projectile projectile projectile-variable yatemplate dockerfile-mode ag flycheck-elixir flycheck-credo magit markdown-mode markdown-mode+ markdown-preview-mode markdown-toc yaml-mode elixir-yasnippets alchemist protobuf-mode ac-alchemist iedit ac-php ac-js2 powerline json-mode flycheck-mix sass-mode scss-mode php-mode iedit alchemist web-mode rainbow-mode erlang ac-slime js2-refactor paredit paren-face auto-complete go-autocomplete go-eldoc yasnippet flycheck go-mode highlight-numbers hl-todo))
  '(plantuml-jar-path
    "/home/dead/bin/plantuml/target/plantuml-1.2019.1-SNAPSHOT.jar")
  '(powerline-default-separator 'wave)
