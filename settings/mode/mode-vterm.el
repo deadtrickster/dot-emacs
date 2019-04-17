@@ -44,11 +44,13 @@
 (setq-default vterm-is-for-project nil)
 
 (defun vterm--rename-buffer-as-title (title)
-  (let ((dir (concat (nth 1 (split-string title ":")) "/")))
-    (cd dir)
-    (rename-buffer (if vterm-is-for-project
-                       (vterm--project-buffer-title)
-                     (vterm--buffer-title)))))
+  (let ((dir (string-trim-left (concat (nth 1 (split-string title ":")) "/"))))
+    (cd-absolute dir)
+    (if (and vterm-is-for-project (not (projectile-project-p)))
+        ;; we left project directory
+        (setq-local vterm-is-for-project nil))
+    (unless vterm-is-for-project
+      (rename-buffer (vterm--buffer-title) t))))
 
 (add-hook 'vterm-set-title-functions 'vterm--rename-buffer-as-title)
 
@@ -85,5 +87,29 @@
         (switch-to-buffer buffer)))))
 
 (define-key global-map [?\C-t] 'vtp)
+
+(define-key vterm-mode-map [kp-0] "0")
+(define-key vterm-mode-map [kp-1] "1")
+(define-key vterm-mode-map [kp-2] "2")
+(define-key vterm-mode-map [kp-3] "3")
+(define-key vterm-mode-map [kp-4] "4")
+(define-key vterm-mode-map [kp-5] "5")
+(define-key vterm-mode-map [kp-6] "6")
+(define-key vterm-mode-map [kp-7] "7")
+(define-key vterm-mode-map [kp-8] "8")
+(define-key vterm-mode-map [kp-9] "9")
+(define-key vterm-mode-map [kp-enter] [return])
+(define-key vterm-mode-map [kp-home] [home])
+(define-key vterm-mode-map [kp-end] [end])
+(define-key vterm-mode-map [kp-left] [left])
+(define-key vterm-mode-map [kp-right] [right])
+(define-key vterm-mode-map [kp-down] [down])
+(define-key vterm-mode-map [kp-up] [up])
+(define-key vterm-mode-map [kp-divide] "/")
+(define-key vterm-mode-map [kp-multiply] "*")
+(define-key vterm-mode-map [kp-subtract] "-")
+(define-key vterm-mode-map [kp-add] "+")
+(define-key vterm-mode-map [kp-decimal] ".")
+(define-key vterm-mode-map [insert] #'vterm-yank)
 
 (provide 'mode-vterm)

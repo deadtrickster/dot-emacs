@@ -9,26 +9,53 @@
 (global-set-key [S-left] 'windmove-left)
 (global-set-key [S-up] 'windmove-up)
 
-(defun swap-buffer-window (direction)
+;; (defun swap-buffer-window (direction)
+;;   "Put the buffer from the selected window in next window, and vice versa"
+;;   (interactive)
+;;   (let* ((this (selected-window))
+;;          (other (windmove-find-other-window direction nil this))
+;;          (this-buffer (window-buffer this))
+;;          (that-buffer (window-buffer other)))
+;;     (set-window-buffer other this-buffer)
+;;     (set-window-buffer this that-buffer)
+;;     ;;(tabbar-close-tab) ;;close current tab
+;;     (select-window other) ;;swap cursor to new buffer
+;;     ))
+;; (global-set-key (kbd "<C-S-left>") (lambda () (interactive)
+;;                                      (swap-buffer-window 'left)))
+;; (global-set-key (kbd "<C-S-right>") (lambda () (interactive)
+;;                                       (swap-buffer-window 'right)))
+;; (global-set-key (kbd "<C-S-up>") (lambda () (interactive)
+;;                                    (swap-buffer-window 'up)))
+;; (global-set-key (kbd "<C-S-down>") (lambda () (interactive)
+;;                                      (swap-buffer-window 'down)))
+
+(windmove-swap-states-default-keybindings '(shift control))
+
+(defun move-buffer-to-window (direction)
   "Put the buffer from the selected window in next window, and vice versa"
-  (interactive)
   (let* ((this (selected-window))
          (other (windmove-find-other-window direction nil this))
-         (this-buffer (window-buffer this))
-         (that-buffer (window-buffer other)))
+         (this-buffer (window-buffer this)))
     (set-window-buffer other this-buffer)
-    (set-window-buffer this that-buffer)
-    ;;(tabbar-close-tab) ;;close current tab
-    (select-window other) ;;swap cursor to new buffer
-    ))
-(global-set-key (kbd "<C-S-left>") (lambda () (interactive)
-                                     (swap-buffer-window 'left)))
-(global-set-key (kbd "<C-S-right>") (lambda () (interactive)
-                                      (swap-buffer-window 'right)))
-(global-set-key (kbd "<C-S-up>") (lambda () (interactive)
-                                   (swap-buffer-window 'up)))
-(global-set-key (kbd "<C-S-down>") (lambda () (interactive)
-                                     (swap-buffer-window 'down)))
+    (previous-buffer)))
+
+(defun move-buffer-right ()
+  (interactive)
+  (move-buffer-to-window 'right))
+
+(defun move-buffer-left ()
+  (interactive)
+  (move-buffer-to-window 'left))
+
+(defun move-buffer-up ()
+  (interactive)
+  (move-buffer-to-window 'up))
+
+(defun move-buffer-down ()
+  (interactive)
+  (move-buffer-to-window 'down))
+
 (global-set-key [next]
                 (lambda () (interactive)
                   (condition-case nil (scroll-up)

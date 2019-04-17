@@ -25,5 +25,6 @@
 (require 'mode-ivy)
 (require 'mode-term)
 (require 'mode-vterm)
+(require 'mode-json)
 
 (provide 'settings-modes)

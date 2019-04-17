@@ -30,11 +30,12 @@
 (defvar ido-dont-ignore-buffer-names '("*scratch*" "*dashboard*" "*Messages*"))
 
 (defun ido-ignore-most-star-buffers (name)
-  (and
-   (string-match-p "^\\*.*\\*" name)
-   (not (member name ido-dont-ignore-buffer-names))))
+  (or (string-match-p "\\` " name)
+      (and
+       (string-match-p "\\`\\*.*\\*" name)
+       (not (member name ido-dont-ignore-buffer-names)))))
 
-(setq ido-ignore-buffers (list "\\^ .*"  #'ido-ignore-most-star-buffers))
+(setq ido-ignore-buffers `(ido-ignore-most-star-buffers))
 
 
 ;; (add-hook 'find-file-hook
