@@ -34,11 +34,6 @@
 ;;   (let ((dir (concat (nth 1 (split-string title ":")) "/")))
 ;;     (cd dir))
 ;;   (rename-buffer (format "term %s" title)))
-;;
-
-(define-key vterm-mode-map [?\C-c] nil)
-(define-key vterm-mode-map [?\C-c ?\C-c] 'vterm--self-insert)
-(define-key vterm-mode-map [delete] #'vterm--self-insert)
 
 (make-local-variable 'vterm-is-for-project)
 (setq-default vterm-is-for-project nil)
@@ -88,6 +83,9 @@
 
 (define-key global-map [?\C-t] 'vtp)
 
+(define-key vterm-mode-map [?\C-c] nil)
+(define-key vterm-mode-map [?\C-c ?\C-c] 'vterm--self-insert)
+(define-key vterm-mode-map [delete] #'vterm--self-insert)
 (define-key vterm-mode-map [kp-0] "0")
 (define-key vterm-mode-map [kp-1] "1")
 (define-key vterm-mode-map [kp-2] "2")
