@@ -17,7 +17,7 @@
    (call-interactively
     (intern
      (ido-completing-read
-      "M-x " 
+      "M-x "
       (all-completions "" obarray 'commandp))))))
 
 (defadvice ido-find-file (after find-file-sudo activate)
@@ -32,10 +32,11 @@
 (defun ido-ignore-most-star-buffers (name)
   (or (string-match-p "\\` " name)
       (and
-       (string-match-p "\\`\\*.*\\*" name)
-       (not (member name ido-dont-ignore-buffer-names)))))
+       (string-match-p "^*" name)
+       (not (member name ido-dont-ignore-buffer-names))
+       0)))
 
-(setq ido-ignore-buffers `(ido-ignore-most-star-buffers))
+(setq ido-ignore-buffers '(ido-ignore-most-star-buffers))
 
 
 ;; (add-hook 'find-file-hook
@@ -45,7 +46,7 @@
 ;;                       (file-writable-p buffer-file-name))
 ;;            (find-alternate-file (concat "/sudo:root@localhost:" buffer-file-name)))))
 ;;
- (rx (or (and "\*" (*? anything) "*/") (and "//" (*? anything) eol)))
+(rx (or (and "\*" (*? anything) "*/") (and "//" (*? anything) eol)))
 
 (provide 'mode-ido)
 

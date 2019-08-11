@@ -123,6 +123,15 @@
 
 (require 'treemacs)
 
+
+ '(treemacs-collapse-dirs 3)
+
+ '(treemacs-directory-collapsed-face ((t (:inherit (variable-pitch default)))))
+ '(treemacs-directory-face ((t (:inherit (variable-pitch default)))))
+ '(treemacs-file-face ((t (:inherit variable-pitch :foreground "#8a8c99"))))
+ '(treemacs-fringe-indicator-face ((t (:foreground "#181a26"))))
+ '(treemacs-root-face ((t (:foreground "#739FCF" :weight bold))))
+
 ;; (define-key treemacs-mode-map [mouse-1] #'treemacs-single-click-expand-action)
 
 (treemacs-git-mode 'extended)

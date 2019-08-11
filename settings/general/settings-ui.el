@@ -104,10 +104,8 @@
 
 (show-paren-mode)
 
-(setq show-paren-mode nil)
-
-;; (add-hook 'minibuffer-setup-hook (lambda ()
-;;                                    (setq-local show-paren-mode nil)))
+(add-hook 'minibuffer-setup-hook (lambda ()
+                                   (setq-local show-paren-mode nil)))
 
 (provide 'settings-ui)
 

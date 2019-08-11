@@ -38,9 +38,13 @@
 (make-local-variable 'vterm-is-for-project)
 (setq-default vterm-is-for-project nil)
 
+(make-local-variable 'vterm-called-from)
+(setq-default vterm-called-from nil)
+
 (defun vterm--rename-buffer-as-title (title)
   (let ((dir (string-trim-left (concat (nth 1 (split-string title ":")) "/"))))
-    (cd-absolute dir)
+    (when (ignore-errors (file-directory-p dir))
+      (cd-absolute dir))
     (if (and vterm-is-for-project (not (projectile-project-p)))
         ;; we left project directory
         (setq-local vterm-is-for-project nil))
@@ -59,33 +63,43 @@
   "Create a new vterm."
   (interactive)
   (let* ((buffer-title (vterm--buffer-title))
-         (existing-buffer (get-buffer buffer-title)))
-    (if existing-buffer
-        (switch-to-buffer existing-buffer)
-      (let ((buffer (generate-new-buffer buffer-title)))
-        (with-current-buffer buffer
-          (vterm-mode))
-        (switch-to-buffer buffer)))))
+         (buffer (or (get-buffer buffer-title)
+                     (let ((buffer (generate-new-buffer buffer-title)))
+                       (with-current-buffer buffer
+                         (vterm-mode))
+                       buffer))))
+    (switch-to-buffer buffer)))
 
 (defun vtp ()
   "Create a new vterm."
   (interactive)
   (let* ((buffer-title (vterm--project-buffer-title))
-         (existing-buffer (get-buffer buffer-title)))
-    (if existing-buffer
-        (switch-to-buffer existing-buffer)
-      (let ((buffer (generate-new-buffer buffer-title)))
-        (with-current-buffer buffer
-          (cd (projectile-project-root))
-          (vterm-mode)
-          (setq-local vterm-is-for-project t))
-        (switch-to-buffer buffer)))))
+         (buffer (or (get-buffer buffer-title)
+                     (let ((buffer (generate-new-buffer buffer-title)))
+                       (with-current-buffer buffer
+                         (cd (projectile-project-root))
+                         (vterm-mode)
+                         (setq-local vterm-is-for-project t))
+                       buffer)))
+         (cb (current-buffer)))
+    (with-current-buffer buffer
+      (setq-local vterm-called-from cb))
+    (switch-to-buffer buffer)))
 
 (define-key global-map [?\C-t] 'vtp)
 
 (define-key vterm-mode-map [?\C-c] nil)
 (define-key vterm-mode-map [?\C-c ?\C-c] 'vterm--self-insert)
 (define-key vterm-mode-map [delete] #'vterm--self-insert)
+
+(defun maybe-go-back-to-caller-buffer ()
+  "Switch back to caller buffer."
+  (interactive)
+  (when vterm-called-from
+    (switch-to-buffer vterm-called-from)))
+
+(define-key vterm-mode-map [?\C-t] 'maybe-go-back-to-caller-buffer)
+
 (define-key vterm-mode-map [kp-0] "0")
 (define-key vterm-mode-map [kp-1] "1")
 (define-key vterm-mode-map [kp-2] "2")

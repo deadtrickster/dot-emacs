@@ -3,36 +3,45 @@
 (require 'use-package)
 (require 'bind-key)
 
-(defun dashboard-insert-workspaces-list (list-display-name list)
-  "Render LIST-DISPLAY-NAME title and project items of LIST."
-  (when (car list)
-    (dashboard-insert-heading list-display-name)
-    (mapc (lambda (w)
-            (insert "\n    ")
-            (widget-create 'push-button
-                           :action `(lambda (&rest ignore)
-                                      (pcase (treemacs-current-visibility)
-                                        ('visible t)
-                                        ('exists  (treemacs-select-window))
-                                        ('none    (treemacs--init)))
-                                      (setf (treemacs-current-workspace) ,w))
-                           :mouse-face 'highlight
-                           :follow-link "\C-m"
-                           :button-prefix ""
-                           :button-suffix ""
-                           :format "%[%t%]"
-                           (abbreviate-file-name (treemacs-workspace->name w))))
-          list)))
+;; (lambda (&rest ignore)
+;;   (pcase (treemacs-current-visibility)
+;;     ('visible t)
+;;     ('exists  (treemacs-select-window))
+;;     ('none    (treemacs--init)))
+;;   (setf (treemacs-current-workspace) ,w))
 
-(defun dashboard-insert-workspaces (list-size)
-  "Add the list of LIST-SIZE items of workspaces."
-  (require 'treemacs)
-  (progn
-    (when (dashboard-insert-workspaces-list
-           "Workspaces:"
-           (dashboard-subseq (treemacs-workspaces)
-                             0 list-size))
-      (dashboard-insert-shortcut "w" "Workspaces:"))))
+
+;; (defun dashboard-insert-workspaces-list (list-display-name list)
+;;   "Render LIST-DISPLAY-NAME title and project items of LIST."
+;;   (when (car list)
+;;     (dashboard-insert-heading list-display-name)
+;;     (mapc (lambda (w)
+;;             (insert "\n    ")
+;;             (widget-create 'push-button
+;;                            :action `(lambda (&rest ignore)
+;;                                       (treemacs)
+;; 				      (setf (treemacs-current-workspace) ,w))
+;;                            :mouse-face 'highlight
+;;                            :follow-link "\C-m"
+;;                            :button-prefix ""
+;;                            :button-suffix ""
+;;                            :format "%[%t%]"
+;;                            (abbreviate-file-name (treemacs-workspace->name w))))
+;;           list)))
+
+;; (defun dashboard-insert-workspaces (list-size)
+;;   "Add the list of LIST-SIZE items of workspaces."
+;;   ;; For some reason, projectile has to be loaded here
+;;   ;; before trying to load projects list
+;;   (require 'treemacs)
+;;   (if (bound-and-true-p projectile-mode)
+;;       (progn
+;; 	(when (dashboard-insert-workspaces-list
+;; 	       "Workspaces:"
+;; 	       (dashboard-subseq (treemacs-workspaces)
+;; 				 0 list-size))
+;; 	  (dashboard-insert-shortcut "p" "Workspaces:")))
+;;     (message "Failed to load workspaces list")))
 
 (use-package dashboard
   :bind (:map dashboard-mode-map
@@ -45,14 +54,14 @@
   (setq dashboard-item-generators  '((recents    . dashboard-insert-recents)
                                      (bookmarks  . dashboard-insert-bookmarks)
                                      (projects   . dashboard-insert-projects)
-                                     (workspaces . dashboard-insert-workspaces)
+                                     ;; (workspaces . dashboard-insert-workspaces)
                                      (agenda     . dashboard-insert-agenda)
                                      (registers  . dashboard-insert-registers)))
 
   (setq dashboard-startup-banner 'official)
   (setq dashboard-items '((recents  . 20)
-                          (workspaces . 20)
-                          (bookmarks . 20)))
+			  ;; (workspaces . 20)
+			  (bookmarks . 20)))
   (dashboard-setup-startup-hook))
 
 (defun dashboard-insert-image-banner (banner)
