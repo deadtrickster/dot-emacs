@@ -24,8 +24,8 @@
 
 ;;; Code:
 
-(font-lock-add-keywords 'elixir-mode
-                        '(("\\<\\(def*\\)\\>" . font-lock-keyword-face)))
+;; (font-lock-add-keywords 'elixir-mode
+;;                         '(("\\<\\(def*\\)\\>" . font-lock-keyword-face)))
 
 (provide 'mode-elixir)
 ;;; mode-elixir.el ends here
