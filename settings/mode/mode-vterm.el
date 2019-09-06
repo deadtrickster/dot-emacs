@@ -3,6 +3,8 @@
 
 (require 'vterm)
 
+(define-key vterm-mode-map [?\C-c] nil)
+
 ;; (add-hook 'vterm-mode-hook (lambda ()
 ;;                              (setq-local auto-revert-interval 1)
 ;;                              (setq-local auto-revert-verbose nil)

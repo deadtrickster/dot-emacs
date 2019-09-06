@@ -15,4 +15,10 @@
 		  (unless (or auto-revert-mode global-auto-revert-mode)
 		    (auto-revert-mode)))))))
 
+(defun magit-diff-master ()
+  (interactive)
+  (magit-diff-range "master.." nil (list (buffer-file-name (current-buffer)))))
+
+(define-key magit-file-mode-map (kbd "<f10>") 'magit-diff-master)
+
 (provide 'mode-magit)
