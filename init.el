@@ -4,9 +4,11 @@
 ;; You may delete these explanatory comments.
 
 (setq load-prefer-newer t)
-(require 'auto-compile)
-(auto-compile-on-load-mode)
-(auto-compile-on-save-mode)
+;(require 'auto-compile)
+;(auto-compile-on-load-mode)
+;(auto-compile-on-save-mode)
+
+;(setq comp-deferred-compilation nil)
 
 (custom-set-variables
  ;; custom-set-variables was added by Custom.
@@ -41,6 +43,10 @@
      (java-mode . "java")
      (awk-mode . "awk")
      (other . "gnu")))
+ '(comp-async-jobs-number 4)
+ '(comp-deferred-compilation-black-list '("slime"))
+ '(comp-never-optimize-functions
+   '(macroexpand scroll-down scroll-up narrow-to-region widen rename-buffer make-indirect-buffer delete-file top-level abort-recursive-edit yes-or-no-p read-key-sequence select-window set-window-buffer split-window-internal use-global-map use-local-map))
  '(company-dabbrev-other-buffers t)
  '(company-idle-delay 0.5)
  '(company-minimum-prefix-length 3)
@@ -53,8 +59,11 @@
  '(display-line-numbers-grow-only t)
  '(display-line-numbers-width-start t)
  '(doc-view-continuous t)
+ '(dumb-jump-force-searcher nil)
+ '(dumb-jump-prefer-searcher nil)
  '(erlang-argument-indent 2)
  '(erlang-icr-indent nil)
+ '(erlang-indent-level 4)
  '(exec-path
    '("/usr/local/sbin" "/usr/local/bin" "/usr/sbin" "/usr/bin" "/sbin" "/bin" "/usr/games" "/usr/local/games" "/snap/bin" "/usr/local/libexec/emacs/27.0.50/x86_64-pc-linux-gnu" "/home/dead/bin"))
  '(flycheck-check-syntax-automatically '(idle-change mode-enabled))
@@ -68,6 +77,7 @@
  '(gc-cons-threshold 1600000)
  '(git-messenger:show-detail t)
  '(git-messenger:use-magit-popup nil)
+ '(global-diff-hl-show-hunk-mouse-mode t)
  '(global-flycheck-mode nil)
  '(hscroll-margin 1)
  '(hscroll-step 1)
@@ -84,6 +94,7 @@
  '(lsp-clients-elixir-server-executable "/home/dead/bin/elixirls/language_server.sh")
  '(lsp-eldoc-hook '(lsp-hover))
  '(lsp-eldoc-render-all nil)
+ '(lsp-elixir-server-command "/home/dead/bin/elixirls/language_server.sh")
  '(lsp-prefer-flymake nil)
  '(lsp-ui-doc-position 'at-point)
  '(lsp-ui-doc-use-childframe t)
@@ -94,8 +105,9 @@
  '(mouse-wheel-progressive-speed nil)
  '(mwheel-tilt-scroll-p t)
  '(next-error-find-buffer-function 'next-error-buffer-on-selected-frame)
+ '(package-native-compile t)
  '(package-selected-packages
-   '(uuidgen uuid thrift csharp-mode slime magit-popup hydra plantuml-mode flycheck-inline smex quelpa quelpa-use-package company-irony company-irony-c-headers flycheck-irony irony lsp-css lsp-sh lsp-clangd ialign ivy-erlang-complete git-commit fontawesome cmake-mode dumb-jump company-c-headers flycheck-dialyxir delight pos-tip auto-compile company-erlang company-statistics use-package bind-key package-utils dashboard flycheck-color-mode-line makefile-executor git-messenger xterm-color magithub copy-as-format git-timemachine git-link scroll-restore counsel ivy counsel-projectile projectile projectile-variable yatemplate dockerfile-mode ag flycheck-elixir flycheck-credo magit markdown-mode markdown-mode+ markdown-preview-mode markdown-toc yaml-mode alchemist protobuf-mode iedit powerline json-mode flycheck-mix iedit alchemist rainbow-mode erlang paredit paren-face auto-complete go-autocomplete go-eldoc flycheck go-mode highlight-numbers hl-todo))
+   '(good-scroll lsp-mode lsp-ui switch-buffer-functions rg posframe kubernetes kubel vcl-mode ivy-xref uuidgen uuid thrift csharp-mode slime magit-popup hydra plantuml-mode flycheck-inline smex quelpa quelpa-use-package company-irony company-irony-c-headers flycheck-irony irony ialign ivy-erlang-complete git-commit fontawesome cmake-mode dumb-jump company-c-headers flycheck-dialyxir delight pos-tip auto-compile company-erlang company-statistics use-package bind-key package-utils dashboard flycheck-color-mode-line makefile-executor git-messenger xterm-color magithub copy-as-format git-timemachine git-link scroll-restore counsel ivy counsel-projectile projectile projectile-variable yatemplate dockerfile-mode ag flycheck-elixir flycheck-credo magit markdown-mode+ markdown-preview-mode markdown-toc yaml-mode alchemist protobuf-mode iedit powerline json-mode iedit alchemist rainbow-mode erlang paredit paren-face auto-complete go-autocomplete go-eldoc flycheck go-mode highlight-numbers hl-todo))
  '(plantuml-jar-path
    "/home/dead/bin/plantuml/target/plantuml-1.2019.1-SNAPSHOT.jar")
  '(powerline-default-separator 'wave)
@@ -198,12 +210,20 @@
 
 (if (file-exists-p "secrets.el")
     (load "secrets.el"))
+(setq comp-deferred-compilation t)
 
+(require 'bind-key)
 (require 'settings)
+(require 'recentf)
+(setq comp-deferred-compilation t)
+
 (defun turn-on-fci-mode ())
 (defun recompile-everything ()
   (interactive)
   (byte-recompile-directory "~/.emacs.d" 0 'force))
+(defun native-recompile-everything ()
+  (interactive)
+  (native-compile-async "~/.emacs.d/" 4 t))
 
 (setq-default bidi-display-reordering nil)
 

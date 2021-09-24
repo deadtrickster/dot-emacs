@@ -13,7 +13,7 @@
 
 (defcustom message-filter-regexp-list '("^Starting new Ispell process \\[.+\\] \\.\\.\\.$"
                                         "^Ispell process killed$"
-                                        "Wrote ")
+                                        "^Wrote ")
   "filter formatted message string to remove noisy messages"
   :type '(list string)
   :group 'general)

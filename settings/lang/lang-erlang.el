@@ -8,15 +8,17 @@
                       (setq indent-tabs-mode nil)
                       ;; (local-set-key (kbd "RET") 'newline-and-indent)
                       (company-mode)
-                      (setq-local ivy-erlang-complete-project-root (projectile-project-root))
+                      ;;(setq-local ivy-erlang-complete-project-root (projectile-project-root))
                       (setq-local company-backends '((company-erlang company-keywords company-dabbrev-code) company-files company-capf company-dabbrev)))))
 
 (setq  erlang-indent-level 2)
 
-(require 'ivy-erlang-complete)
-(add-hook 'erlang-mode-hook #'ivy-erlang-complete-init)
-;; automatic update completion data after save
-(add-hook 'after-save-hook #'ivy-erlang-complete-reparse)
+;; (require 'ivy-erlang-complete)
+;; (add-hook 'erlang-mode-hook #'ivy-erlang-complete-init)
+;; ;; automatic update completion data after save
+;; (add-hook 'after-save-hook #'ivy-erlang-complete-reparse)
+;;
+
 
 ;; (add-to-list 'load-path
 ;;           "/usr/local/lib/erlang/lib/wrangler-1.2.0/elisp")
@@ -37,12 +39,14 @@
 (require 'flycheck-rebar3)
 (flycheck-rebar3-setup)
 
-(with-eval-after-load 'erlang-mode
-  (bind-key [f12] (lambda ()
-                    (interactive)
-                    (delete-trailing-whitespace)
-                    (erlang-format))
-            erlang-mode-map))
+(eval-after-load 'erlang-mode
+  '(progn (bind-key [f12] (lambda ()
+                            (interactive)
+                            (delete-trailing-whitespace)
+                            (erlang-format))
+                    erlang-mode-map)
+          (define-key erlang-mode-map (kbd "M-.")
+            #'dumb-jump-go)))
 
 (require 'erlang-format)
 
@@ -54,5 +58,6 @@
                                        (when (file-exists-p sourcer-config-filename)
                                          (setq erlfmt-args (list "--config" sourcer-config-filename))))
                                    (setq erlfmt-args nil))))
-
+(define-key erlang-mode-map (kbd "M-.")
+            #'dumb-jump-go)
 (provide 'lang-erlang)

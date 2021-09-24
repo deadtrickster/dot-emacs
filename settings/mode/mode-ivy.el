@@ -1,3 +1,5 @@
+(require 'use-package)
+
 (use-package ivy
   :diminish ivy-mode
   :config

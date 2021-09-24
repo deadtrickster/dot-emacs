@@ -1,5 +1,5 @@
 
-(add-to-list 'load-path "/home/dead/Projects/emacs-libvterm")
+;; (add-to-list 'load-path "/home/dead/Projects/emacs-libvterm")
 
 (require 'vterm)
 

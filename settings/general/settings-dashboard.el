@@ -78,6 +78,8 @@
       (insert-image spec)
       (insert "\n\n"))))
 
+(require 'dashboard)
+
 (dashboard-setup-startup-hook)
 
 ;; (add-hook 'dashboard-mode-hook
@@ -102,6 +104,8 @@
    (setq initial-buffer-choice
          (lambda ()
            (get-buffer dashboard-buffer-name)))))
+
+(require 'recentf)
 
 (add-to-list 'recentf-exclude "\\.emacs\\.d/elpa")
 (add-to-list 'recentf-exclude "\\.emacs\\.d/bookmarks")

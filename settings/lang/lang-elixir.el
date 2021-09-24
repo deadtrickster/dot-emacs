@@ -17,8 +17,8 @@
 (eval-after-load 'flycheck-credo
   '(setq flycheck-elixir-credo-strict t))
 
-(with-eval-after-load 'elixir-mode
-  (bind-key [f12] 'mix-format elixir-mode-map))
+(eval-after-load 'elixir-mode
+  '(progn (bind-key [f12] 'mix-format elixir-mode-map)))
 
 (require 'mix-format)
 

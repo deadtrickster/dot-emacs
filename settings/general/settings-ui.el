@@ -6,6 +6,8 @@
 
 (load-theme 'deeper-blue)
 
+(require 'powerline)
+
 ;; (require 'smooth-scroll)
 ;; (setf smooth-scroll-mode t)
 
@@ -97,9 +99,9 @@
 
 (powerline-my-theme)
 
-(setq frame-title-format
-      '(buffer-file-name "%f"
-                         (dired-directory dired-directory "%b")))
+;; (setq frame-title-format
+;;       '(buffer-file-name "%f"
+;;                          (dired-directory dired-directory "%b")))
 
 
 (show-paren-mode)
