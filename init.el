@@ -1,21 +1,10 @@
-;; Added by Package.el.  This must come before configurations of
-;; installed packages.  Don't delete this line.  If you don't want it,
-;; just comment it out by adding a semicolon to the start of the line.
-;; You may delete these explanatory comments.
-
-(setq load-prefer-newer t)
-(require 'auto-compile)
-(auto-compile-on-load-mode)
-(auto-compile-on-save-mode)
+;;; -*- lexical-binding: t; -*-
 
 (custom-set-variables
  ;; custom-set-variables was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
- '(ag-reuse-buffers t)
- '(ag-reuse-window nil)
- '(alchemist-test-status-modeline nil)
  '(ansi-color-names-vector
    [("black" . "#555753")
     ("#CC0000" . "#EF2929")
@@ -25,118 +14,51 @@
     ("#75507B" . "#AD7FA8")
     ("#06989A" . "#34E2E2")
     ("#D3D7CF" . "#EEEEEC")])
- '(auto-compile-check-parens nil)
- '(auto-compile-ding nil)
- '(auto-compile-use-mode-line nil)
- '(auto-compression-mode t)
- '(auto-insert-mode t)
- '(auto-revert-interval 1)
- '(auto-revert-use-notify t)
- '(auto-save-default nil)
- '(auto-save-visited-mode nil)
- '(backup-by-copying t)
- '(c-basic-offset 4)
- '(c-default-style
-   '((c++-mode . "bsd")
-     (java-mode . "java")
-     (awk-mode . "awk")
-     (other . "gnu")))
- '(company-dabbrev-other-buffers t)
- '(company-idle-delay 0.5)
- '(company-minimum-prefix-length 3)
- '(company-statistics-file "~/.emacs.d/.company-statistics-cache.el")
- '(company-tooltip-maximum-width 60)
- '(company-tooltip-minimum-width 60)
- '(counsel-ag-base-command "ag --nocolor --nogroup %s")
- '(create-lockfiles nil)
+ '(blink-cursor-mode nil)
+ '(custom-enabled-themes '(deeper-blue))
+ '(dashboard-items
+   '((recents . 10)
+     (bookmarks . 5)
+     (projects . 5)
+     (registers . 5)))
  '(delete-selection-mode t)
+ '(diff-hl-global-modes '(not image-mode))
+ '(diff-hl-show-hunk-function 'diff-hl-show-hunk-posframe)
  '(display-line-numbers-grow-only t)
+ '(display-line-numbers-widen t)
+ '(display-line-numbers-width 2)
  '(display-line-numbers-width-start t)
- '(doc-view-continuous t)
- '(erlang-argument-indent 2)
- '(erlang-icr-indent nil)
- '(exec-path
-   '("/usr/local/sbin" "/usr/local/bin" "/usr/sbin" "/usr/bin" "/sbin" "/bin" "/usr/games" "/usr/local/games" "/snap/bin" "/usr/local/libexec/emacs/27.0.50/x86_64-pc-linux-gnu" "/home/dead/bin"))
- '(flycheck-check-syntax-automatically '(idle-change mode-enabled))
- '(flycheck-clang-args "-std=gnu++11")
- '(flycheck-clang-language-standard "gnu++11")
- '(flycheck-disabled-checkers '(emacs-lisp-checkdoc))
- '(flycheck-elixir-credo-strict t)
- '(flycheck-indication-mode 'right-fringe)
- '(flycheck-mode-line-prefix "Syntax")
- '(fringe-mode '(11) nil (fringe))
- '(gc-cons-threshold 1600000)
- '(git-messenger:show-detail t)
- '(git-messenger:use-magit-popup nil)
- '(global-flycheck-mode nil)
- '(hscroll-margin 1)
- '(hscroll-step 1)
- '(ido-case-fold t)
- '(ido-enable-flex-matching t)
- '(ido-max-window-height 1)
- '(indent-tabs-mode nil)
- '(inhibit-startup-echo-area-message "dead")
- '(inhibit-startup-screen t)
- '(initial-buffer-choice nil)
- '(initial-scratch-message nil)
- '(ivy-mode nil)
- '(ivy-wrap t)
- '(lsp-clients-elixir-server-executable "/home/dead/bin/elixirls/language_server.sh")
- '(lsp-eldoc-hook '(lsp-hover))
- '(lsp-eldoc-render-all nil)
- '(lsp-prefer-flymake nil)
- '(lsp-ui-doc-position 'at-point)
- '(lsp-ui-doc-use-childframe t)
- '(make-backup-files t)
- '(menu-bar-mode nil)
- '(mouse-1-click-follows-link -150)
- '(mouse-1-click-in-non-selected-windows t)
- '(mouse-wheel-progressive-speed nil)
- '(mwheel-tilt-scroll-p t)
- '(next-error-find-buffer-function 'next-error-buffer-on-selected-frame)
+ '(flymake-fringe-indicator-position 'right-fringe)
+ '(global-diff-hl-mode t)
+ '(global-diff-hl-show-hunk-mouse-mode t)
+ '(lsp-auto-guess-root t)
+ '(lsp-elixir-local-server-command
+   "/Users/ikhaprov/Projects/elixir-ls/release/language_server.sh")
+ '(lsp-elixir-server-command
+   '("/Users/ikhaprov/Projects/elixir-ls/release/language_server.sh"))
+ '(lsp-enable-symbol-highlighting nil)
+ '(lsp-headerline-breadcrumb-enable nil)
+ '(max-mini-window-height 1)
+ '(native-comp-async-report-warnings-errors 'silent)
+ '(ns-command-modifier 'control)
  '(package-selected-packages
-   '(uuidgen uuid thrift csharp-mode slime magit-popup hydra plantuml-mode flycheck-inline smex quelpa quelpa-use-package company-irony company-irony-c-headers flycheck-irony irony lsp-css lsp-sh lsp-clangd ialign ivy-erlang-complete git-commit fontawesome cmake-mode dumb-jump company-c-headers flycheck-dialyxir delight pos-tip auto-compile company-erlang company-statistics use-package bind-key package-utils dashboard flycheck-color-mode-line makefile-executor git-messenger xterm-color magithub copy-as-format git-timemachine git-link scroll-restore counsel ivy counsel-projectile projectile projectile-variable yatemplate dockerfile-mode ag flycheck-elixir flycheck-credo magit markdown-mode markdown-mode+ markdown-preview-mode markdown-toc yaml-mode alchemist protobuf-mode iedit powerline json-mode flycheck-mix iedit alchemist rainbow-mode erlang paredit paren-face auto-complete go-autocomplete go-eldoc flycheck go-mode highlight-numbers hl-todo))
- '(plantuml-jar-path
-   "/home/dead/bin/plantuml/target/plantuml-1.2019.1-SNAPSHOT.jar")
- '(powerline-default-separator 'wave)
- '(powerline-gui-use-vcs-glyph nil)
- '(projectile-mode t nil (projectile))
- '(projectile-mode-line '(:eval (format " [%s]" (projectile-project-name))))
- '(quelpa-checkout-melpa-p nil)
- '(safe-local-variable-values
-   '((projectile-project-run-cmd . "mkdir -p build; cd build; cmake ..; make run")
-     (projectile-project-compilation-cmd . "mkdir -p build; cd build; cmake ..; make")
-     (company-clang-arguments "-std=gnu++11")))
- '(savehist-file "~/.emacs.d/.history")
- '(savehist-mode t)
- '(search-upper-case nil)
- '(send-mail-function 'smtpmail-send-it)
- '(shell-file-name "bash")
+   '(centaur-tabs eldoc-box mini-frame origami :origami dired-collapse dired-subtree all-the-icons-dired grip-mode envrc magit evil company-quickhelp company-posframe company go-mode go-projectile delight doom-themes doom-modeline caddyfile-mode yaml-mode yaml gitignore-mode swiper ivy ivy-xref dumb-jump diminish web-mode elixir-mode iedit bazel diff-hl treemacs treemacs-projectile rg exec-path-from-shell vterm dashboard lsp-mode undo-fu use-package projectile erlang good-scroll))
+ '(show-paren-mode t)
+ '(show-paren-priority -50)
  '(show-paren-style 'expression)
- '(temporary-file-directory "/tmp")
  '(tool-bar-mode nil)
- '(tooltip-delay 0.2)
- '(tramp-syntax 'default nil (tramp))
  '(truncate-lines t)
- '(vterm-keymap-exceptions
-   '("C-y" "C-x" "C-u" "C-g" "C-h" "M-x" "M-o" "M-w" "<C-left>" "<C-right>" "<S-left>" "<S-right>" "<S-up>" "<S-down>"))
- '(vterm-max-scrollback 10000)
- '(x-gtk-use-system-tooltips nil)
- '(yas-buffer-local-condition '(looking-at "\\>")))
+ '(warning-suppress-types '((lsp-mode))))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
- '(default ((t (:inherit nil :stipple nil :background "#181a26" :foreground "gray80" :inverse-video nil :box nil :strike-through nil :overline nil :underline nil :slant normal :weight normal :height 116 :width normal :foundry "PfEd" :family "Roboto Mono"))))
- '(company-preview ((t (:foreground "darkgray" :underline t))))
- '(company-preview-common ((t (:inherit company-preview))))
- '(company-scrollbar-bg ((t (:background "dark gray"))))
- '(company-scrollbar-fg ((t (:background "gray25"))))
- '(company-tooltip ((t (:background "lightgray" :foreground "black"))))
- '(company-tooltip-common ((((type x)) (:inherit company-tooltip :weight bold)) (t (:inherit company-tooltip))))
- '(company-tooltip-common-selection ((((type x)) (:inherit company-tooltip-selection :weight bold)) (t (:inherit company-tooltip-selection))))
- '(company-tooltip-selection ((t (:background "steelblue" :foreground "white"))))
+ '(default ((t (:inherit nil :stipple nil :background "#181a26" :foreground "gray80" :inverse-video nil :box nil :strike-through nil :overline nil :underline nil :slant normal :weight normal :height 136 :width normal :foundry "PfEd" :family "Roboto Mono"))))
+ '(compilation-error ((t (:foreground "#D9786B"))))
+ '(compilation-info ((t (:foreground "#A3A9CE" :weight normal))))
+ '(compilation-warning ((t (:inherit warning :foreground "#FDB262"))))
+ '(custom-button ((t (:background "#606163" :foreground "#e8e9e9" :box (:line-width (2 . 2) :style flat-button)))))
  '(diff-hl-change ((t (:background "#333355" :foreground "DeepSkyBlue1"))))
  '(diff-hl-delete ((t (:inherit diff-removed :foreground "red1"))))
  '(diff-hl-insert ((t (:inherit diff-added :foreground "green1"))))
@@ -144,19 +66,13 @@
  '(fringe ((t (:background "#181a26"))))
  '(highlight ((t (:underline t))))
  '(hl-line ((t (:background "#2b2d36"))))
- '(internal-border ((t (:background "dark gray"))))
- '(js2-object-property ((t (:inherit default :foreground "goldenrod"))))
  '(line-number ((t (:inherit (shadow default) :foreground "gray34"))))
  '(line-number-current-line ((t (:inherit line-number :foreground "gray60"))))
  '(link ((t (:slant italic))))
- '(mode-line ((t (:background "dim gray" :foreground "black" :box (:line-width 1 :color "gray40")))))
- '(mode-line-buffer-id ((t (:inherit powerline-active1 :foreground "gray" :weight bold))))
- '(mode-line-buffer-id-inactive ((t (:inherit powerline-inactive1 :foreground "#888888" :weight bold))))
- '(mode-line-inactive ((t (:foreground "black" :box (:line-width 1 :color "gray40")))))
+ '(mode-line ((t (:background "#282b35" :foreground "#737475" :box (:line-width (1 . 1) :style flat-button)))))
+ '(mode-line-buffer-id ((t (:distant-foreground "#969696" :foreground "gray75" :weight bold))))
+ '(mode-line-inactive ((t (:background "#282b35" :foreground "#737475" :box (:line-width (1 . 1) :color "#121214" :style flat-button)))))
  '(parenthesis ((t (:inherit default :foreground "dim gray"))))
- '(powerline-active1 ((t (:inherit mode-line :background "grey17" :foreground "#777777"))))
- '(powerline-active2 ((t (:inherit mode-line :background "grey40" :foreground "black"))))
- '(powerline-inactive1 ((t (:inherit mode-line-inactive :background "grey11" :foreground "#666666"))))
  '(show-paren-match ((t (:background "#2f334b"))))
  '(term-color-black ((t (:background "#555753" :foreground "black"))))
  '(term-color-blue ((t (:background "#739FCF" :foreground "#3465A4"))))
@@ -166,172 +82,391 @@
  '(term-color-red ((t (:background "#EF2929" :foreground "#CC0000"))))
  '(term-color-white ((t (:background "#EEEEEC" :foreground "#D3D7CF"))))
  '(term-color-yellow ((t (:background "#FCE94F" :foreground "#C4A000"))))
+ '(tooltip ((t (:inherit default :height 1.0))))
  '(vterm-color-black ((t (:inherit term-color-black))))
- '(vterm-color-black-bg ((t (:background "#555753"))))
  '(vterm-color-blue ((t (:inherit term-color-blue))))
- '(vterm-color-blue-bg ((t (:background "#739FCF"))))
- '(vterm-color-blue-fg ((t (:foreground "#3465A4"))))
  '(vterm-color-cyan ((t (:inherit term-color-cyan))))
- '(vterm-color-cyan-bg ((t (:background "#34E2E2"))))
- '(vterm-color-cyan-fg ((t (:foreground "#06989A"))))
- '(vterm-color-default-bg ((t (:background "#181a26"))))
- '(vterm-color-default-fg ((t (:foreground "gray80"))))
  '(vterm-color-green ((t (:inherit term-color-green))))
- '(vterm-color-green-bg ((t (:background "#8AE234"))))
- '(vterm-color-green-fg ((t (:foreground "#4E9A06"))))
  '(vterm-color-magenta ((t (:inherit term-color-magenta))))
- '(vterm-color-magenta-bg ((t (:foreground "#AD7FA8"))))
- '(vterm-color-magenta-fg ((t (:foreground "#75507B"))))
  '(vterm-color-red ((t (:inherit term-color-red))))
- '(vterm-color-red-bg ((t (:background "#EF2929"))))
- '(vterm-color-red-fg ((t (:foreground "#CC0000"))))
  '(vterm-color-white ((t (:inherit term-color-white))))
- '(vterm-color-white-bg ((t (:background "#EEEEEC"))))
- '(vterm-color-white-fg ((t (:foreground "#D3D7CF"))))
  '(vterm-color-yellow ((t (:inherit term-color-yellow))))
- '(vterm-color-yellow-bg ((t (:background "#FCE94F"))))
- '(vterm-color-yellow-fg ((t (:foreground "#C4A000")))))
+ '(widget-field ((t (:extend t :background "#171A27" :box (:line-width (1 . 3) :color "#737687" :style flat-button) :weight bold :height 1.0)))))
 
-(package-install-selected-packages)
+(require 'good-scroll)
+(good-scroll-mode 1)
+;; (global-set-key [next] #'good-scroll-up-full-screen)
+;; (global-set-key [prior] #'good-scroll-down-full-screen)
+(toggle-truncate-lines)
 
-(load "~/.emacs.d/paths.el")
+(require 'projectile)
+;; Recommended keymap prefix on macOS
+(define-key projectile-mode-map (kbd "s-p") 'projectile-command-map)
+;; Recommended keymap prefix on -Windows/Linux
+(define-key projectile-mode-map (kbd "C-c p") 'projectile-command-map)
+(projectile-mode +1)
 
-(if (file-exists-p "secrets.el")
-    (load "secrets.el"))
 
-(require 'settings)
-(defun turn-on-fci-mode ())
-(defun recompile-everything ()
+(use-package undo-fu
+  :config
+  (global-unset-key (kbd "C-z"))
+  (global-set-key (kbd "C-z")   'undo-fu-only-undo)
+  (global-set-key (kbd "C-S-z") 'undo-fu-only-redo))
+
+
+(setq ido-enable-flex-matching t)
+(setq ido-everywhere t)
+(ido-mode 1)
+
+(require 'windmove)
+(defun ignore-error-wrapper (fn)
+  "Funtion return new function that ignore errors.
+   The function wraps a function with `ignore-errors' macro."
+  (let ((fn fn))
+    (lambda ()
+      (interactive)
+      (ignore-errors
+        (funcall fn)))))
+(global-set-key [C-left] (ignore-error-wrapper 'windmove-left))
+(global-set-key [C-right] (ignore-error-wrapper 'windmove-right))
+(global-set-key [C-up] (ignore-error-wrapper 'windmove-up))
+(global-set-key [C-down] (ignore-error-wrapper 'windmove-down))
+
+(use-package lsp-mode
+  :commands lsp
+  :ensure t
+  :diminish lsp-mode
+  :hook
+  (elixir-mode . lsp)
+  (erlang-mode . lsp)
+  (go-mode . lsp-deferred)
+  (sh-mode . lsp)
+  :init
+  (add-to-list 'exec-path "/Users/ikhaprov/Projects/elixir-ls/release"))
+
+;; Set up before-save hooks to format buffer and add/delete imports.
+;; Make sure you don't have other gofmt/goimports hooks enabled.
+(defun lsp-go-install-save-hooks ()
+  (add-hook 'before-save-hook #'lsp-format-buffer t t)
+  (add-hook 'before-save-hook #'lsp-organize-imports t t))
+(add-hook 'go-mode-hook #'lsp-go-install-save-hooks)
+
+
+(when (memq window-system '(mac ns x))
+  (exec-path-from-shell-initialize))
+
+(setq projectile-mode-line-function '(lambda () (format " Π[%s]" (projectile-project-name))))
+
+(use-package dashboard
+  :ensure t
+  :config
+  (dashboard-setup-startup-hook))
+
+(setq initial-buffer-choice (lambda () (get-buffer "*dashboard*")))
+
+(setq dashboard-items '((recents  . 5)
+                        (bookmarks . 5)
+                        (projects . 5)
+                        (registers . 5)))
+
+(advice-add 'view-echo-area-messages
+            :filter-return (lambda (win) (select-window win :mark-for-redisplay)))
+
+(require 'diff-hl-flydiff)
+
+(diff-hl-flydiff-mode 1)
+
+(require 'iedit)
+
+(setf iedit-mode t)
+
+(define-key global-map (kbd "C-;") 'iedit-mode)
+(define-key isearch-mode-map (kbd "C-;") 'iedit-mode-from-isearch)
+(define-key esc-map (kbd "C-;") 'iedit-execute-last-modification)
+(define-key help-map (kbd "C-;") 'iedit-mode-toggle-on-function)
+
+(defadvice vc-mode-line (after strip-backend () activate)
+  (when (stringp vc-mode)
+    (let ((gitlogo (replace-regexp-in-string "^ Git." "Γ:" vc-mode)))
+      (setq vc-mode gitlogo))))
+
+(setq mode-line-percent-position nil)
+
+(defun flymake--mode-line-title ()
+  `(:propertize
+    "Φ"
+    mouse-face mode-line-highlight
+    help-echo
+    ,(lambda (&rest _)
+       (concat
+        (format "%s known backends\n" (hash-table-count flymake--state))
+        (format "%s running\n" (length (flymake-running-backends)))
+        (format "%s disabled\n" (length (flymake-disabled-backends)))
+        "mouse-1: Display minor mode menu\n"
+        "mouse-2: Show help for minor mode"))
+    keymap
+    ,(let ((map (make-sparse-keymap)))
+       (define-key map [mode-line down-mouse-1]
+         flymake-menu)
+       (define-key map [mode-line down-mouse-3]
+         flymake-menu)
+       (define-key map [mode-line mouse-2]
+         (lambda ()
+           (interactive)
+           (describe-function 'flymake-mode)))
+       map)))
+
+(setq mode-line-modes (let ((recursive-edit-help-echo
+                             "Recursive edit, type M-C-c to get out"))
+                        (list (propertize "%[" 'help-echo recursive-edit-help-echo)
+
+                              `(:propertize ("" mode-name)
+                                            help-echo "Major mode\n\
+mouse-1: Display major mode menu\n\
+mouse-2: Show help for major mode\n\
+mouse-3: Toggle minor modes"
+                                            mouse-face mode-line-highlight
+                                            local-map ,mode-line-major-mode-keymap)
+                              ","
+                              '("" mode-line-process)
+                              `(:propertize ("" minor-mode-alist)
+                                            mouse-face mode-line-highlight
+                                            help-echo "Minor mode\n\
+mouse-1: Display minor mode menu\n\
+mouse-2: Show help for minor mode\n\
+mouse-3: Toggle minor modes"
+                                            local-map ,mode-line-minor-mode-keymap)
+                              (propertize "%n" 'help-echo "mouse-2: Remove narrowing from buffer"
+                                          'mouse-face 'mode-line-highlight
+                                          'local-map (make-mode-line-mouse-map
+                                                      'mouse-2 #'mode-line-widen))
+
+                              (propertize "%]" 'help-echo recursive-edit-help-echo)
+                              " ")))
+
+(setf active-buffer-id '(#("%12b" 0 4
+                           (face mode-line-buffer-id help-echo "Buffer name
+mouse-1: Previous buffer
+mouse-3: Next buffer" mouse-face mode-line-highlight local-map
+(keymap
+ (header-line keymap
+              (mouse-3 . mode-line-next-buffer)
+              (down-mouse-3 . ignore)
+              (mouse-1 . mode-line-previous-buffer)
+              (down-mouse-1 . ignore))
+ (mode-line keymap
+            (mouse-3 . mode-line-next-buffer)
+            (mouse-1 . mode-line-previous-buffer)))))))
+
+(setf inactive-buffer-id '(#("%12b" 0 4
+                             (face mode-line-inactive help-echo "Buffer name
+mouse-1: Previous buffer
+mouse-3: Next buffer" mouse-face mode-line-highlight local-map
+(keymap
+ (header-line keymap
+              (mouse-3 . mode-line-next-buffer)
+              (down-mouse-3 . ignore)
+              (mouse-1 . mode-line-previous-buffer)
+              (down-mouse-1 . ignore))
+ (mode-line keymap
+            (mouse-3 . mode-line-next-buffer)
+            (mouse-1 . mode-line-previous-buffer)))))))
+
+(defvar powerline-selected-window (frame-selected-window)
+  "Selected window.")
+
+(defun powerline-selected-window-active ()
+  "Return whether the current window is active."
+  (eq powerline-selected-window (selected-window)))
+
+(defun powerline-set-selected-window (frame)
+  "Set the variable `powerline-selected-window' appropriately."
+  (when (not (minibuffer-window-active-p (frame-selected-window frame)))
+    (setq powerline-selected-window (frame-selected-window frame))
+    (force-mode-line-update)))
+
+(defun powerline-unset-selected-window ()
+  "Unset the variable `powerline-selected-window' and update the mode line."
+  (setq powerline-selected-window nil)
+  (force-mode-line-update))
+
+(add-hook 'window-selection-change-functions 'powerline-set-selected-window)
+
+(setq-default mode-line-buffer-identification '(:eval (if (powerline-selected-window-active)
+                                                          active-buffer-id
+                                                        inactive-buffer-id)))
+
+(use-package diminish
+  :diminish abbrev-mode
+  :diminish org-indent-mode
+  :diminish apheleia-mode
+  :diminish auto-revert-mode
+  :diminish hungry-delete-mode
+  :diminish hungry-delete
+  :diminish lisp-interaction-mode
+  :diminish visual-line-mode
+  :diminish subword-mode
+  :diminish auto-fill-function)
+
+(defun apply-my-delight-list ()
+  (delight '((company-mode nil company)
+             (abbrev-mode nil abbrev)
+             (eldoc-mode nil eldoc)
+             (flyspell-mode nil flyspell)
+             (paredit-mode nil paredit)
+             (rainbow-mode nil rainbow-mode)
+             (yas-minor-mode nil yasnippet)
+             (page-break-lines-mode nil page-break-lines)
+             (auto-revert-mode nil auto-revert)
+             ;; (projectile-mode nil projectile)
+             )))
+
+(apply-my-delight-list)
+
+(defun indent-whole-buffer ()
+  "indent whole buffer"
   (interactive)
-  (byte-recompile-directory "~/.emacs.d" 0 'force))
+  (delete-trailing-whitespace)
+  (indent-region (point-min) (point-max) nil)
+  (untabify (point-min) (point-max)))
 
-(setq-default bidi-display-reordering nil)
+(defun er-switch-to-previous-buffer ()
+  "Switch to previously open buffer.
+Repeated invocations toggle between the two most recently open buffers."
+  (interactive)
+  (switch-to-prev-buffer (selected-window) 1))
 
-(defun my-command-error-function (data context caller)
-  "Ignore the buffer-read-only, beginning-of-buffer,
-end-of-buffer signals; pass the rest to the default handler."
-  (when (not (memq (car data) '(beginning-of-buffer
-                                end-of-buffer)))
-    (command-error-default-function data context caller)))
+(global-set-key (kbd "<home>") 'beginning-of-line)
+(global-set-key (kbd "<end>") 'end-of-line)
+(global-set-key "\C-cc" 'comment-or-uncomment-region)
+(global-set-key [f12] 'indent-whole-buffer)
+(global-set-key [f11] 'delete-trailing-whitespace)
+(global-set-key "\C-d" 'dired-jump)
+(require 'vterm)
+(define-key vterm-mode-map [?\C-t] 'er-switch-to-previous-buffer)
+(define-key vterm-mode-map [?\C-d] #'vterm--self-insert)
+(define-key vterm-mode-map [deletechar] #'vterm-send-delete)
+(define-key vterm-mode-map [C-up] (ignore-error-wrapper 'windmove-up))
+(define-key vterm-mode-map [C-down] (ignore-error-wrapper 'windmove-down))
+(define-key vterm-mode-map [C-left] (ignore-error-wrapper 'windmove-left))
+(define-key vterm-mode-map [C-right] (ignore-error-wrapper 'windmove-right))
 
-(setq command-error-function #'my-command-error-function)
+(defun my-projectile-run-vterm (&optional arg)
+  "
+CHANGE: set PROJECTILE_PROJECT_NAME env var, so shells can use it somehow.
+For example, to name byobu sessions.
+
+Invoke `vterm' in the project's root.
+
+Switch to the project specific term buffer if it already exists.
+
+Use a prefix argument ARG to indicate creation of a new process instead."
+  (interactive "P")
+  (let* ((project (projectile-acquire-root))
+         (buffer (projectile-generate-process-name "vterm" arg project))
+         (vterm-environment (append `(,(concat "PROJECTILE_PROJECT_NAME="
+                                               (projectile-project-name project)))
+                                    vterm-environment)))
+    (unless (buffer-live-p (get-buffer buffer))
+      (unless (require 'vterm nil 'noerror)
+        (error "Package 'vterm' is not available"))
+      (projectile-with-default-dir project
+        (vterm buffer)))
+    (switch-to-buffer buffer)))
+
+(define-key global-map [?\C-t] 'my-projectile-run-vterm)
+
+(defun rename-file-and-buffer ()
+  "Rename the current buffer and file it is visiting."
+  (interactive)
+  (let ((filename (buffer-file-name)))
+    (if (not (and filename (file-exists-p filename)))
+        (message "Buffer is not visiting a file!")
+      (let ((new-name (read-file-name "New name: " filename)))
+        (cond
+         ((vc-backend filename) (vc-rename-file filename new-name))
+         (t
+          (rename-file filename new-name t)
+          (set-visited-file-name new-name t t)))))))
+
+(add-hook 'prog-mode-hook 'company-mode)
+
+(add-to-list 'auto-mode-alist '("\\(/\\|\\`\\)[Mm]akefile" . makefile-gmake-mode))
+
+;;; from doom
+
+;; Don't generate backups or lockfiles. While auto-save maintains a copy so long
+;; as a buffer is unsaved, backups create copies once, when the file is first
+;; written, and never again until it is killed and reopened. This is better
+;; suited to version control, and I don't want world-readable copies of
+;; potentially sensitive material floating around our filesystem.
+(setq create-lockfiles nil
+      make-backup-files nil
+      ;; But in case the user does enable it, some sensible defaults:
+      version-control t     ; number each backup file
+      backup-by-copying t   ; instead of renaming current file (clobbers links)
+      delete-old-versions t ; clean up after itself
+      kept-old-versions 5
+      kept-new-versions 5
+      backup-directory-alist (list (cons "." "/Users/ikhaprov/.emacs.d/backups/"))
+      tramp-backup-directory-alist backup-directory-alist)
+
+;; But turn on auto-save, so we have a fallback in case of crashes or lost data.
+;; Use `recover-file' or `recover-session' to recover them.
+(setq auto-save-default t
+      ;; Don't auto-disable auto-save after deleting big chunks. This defeats
+      ;; the purpose of a failsafe. This adds the risk of losing the data we
+      ;; just deleted, but I believe that's VCS's jurisdiction, not ours.
+      auto-save-include-big-deletions t
+      auto-save-list-file-prefix "/Users/ikhaprov/.emacs.d/autosave/"
+      tramp-auto-save-directory  "/Users/ikhaprov/.emacs.d/tramp-autosave/"
+      auto-save-file-name-transforms
+      (list (list "\\`/[^/]*:\\([^/]*/\\)*\\([^/]*\\)\\'"
+                  ;; Prefix tramp autosaves to prevent conflicts with local ones
+                  (concat auto-save-list-file-prefix "tramp-\\2") t)
+            (list ".*" auto-save-list-file-prefix t)))
+
+(use-package grip-mode
+  :ensure t
+  :bind (:map markdown-mode-command-map
+              ("g" . grip-mode)))
+
+(use-package dired-subtree
+  :ensure t
+  :after dired
+  :config
+  (define-key dired-mode-map (kbd "<tab>") 'dired-subtree-toggle))
 
 
-;;;; $ cat ~/.config/systemd/user/default.target.wants/emacs.service
-;; [Unit]
-;; Description=Emacs text editor
-;; Documentation=info:emacs man:emacs(1) https://gnu.org/software/emacs/
-;;
-;; [Service]
-;; Type=simple
-;; ExecStart=/usr/local/bin/emacs --fg-daemon
-;; ExecStop=/usr/local/bin/emacsclient --eval "(kill-emacs)"
-;; Environment=SSH_AUTH_SOCK=%t/keyring/ssh
-;; Restart=on-failure
-;;
-;; [Install]
-;; WantedBy=default.target
-;;;;
+
+(use-package origami
+  :ensure t)
+
+(global-set-key [C-tab] 'origami-toggle-node)
+
+(require 'lsp)
+(add-to-list 'lsp-file-watch-ignored-directories "[/\\]\_build")
+(add-to-list 'lsp-file-watch-ignored-directories "[/\\]vendor")
+(add-to-list 'lsp-file-watch-ignored-directories "[/\\\\]vendor\\'")
 
 
-;;;; $ cat /usr/bin/emacs-client.sh
-;; #!/bin/bash
-;;
-;; emacsclient -n -e "(if (> (length (frame-list)) 1) 't)" | grep t
-;; if [ "$?" = "1" ]; then
-;;     emacsclient -c -n -a "" "$@"
-;; else
-;;     emacsclient -n -a "" "$@"
-;; fi
-;;;;
+(setq max-mini-window-height 2)
 
-;;;; Ramdisk for /tmp
-;; tmpfs    /tmp            tmpfs defaults,noatime,nosuid,nodev,noexec,mode=1777,size=512M  0 0
-;;;;
+(mini-frame-mode)
 
-;; (setq shell-command-switch "-ic")
+(defun insert-newline-before-line ()
+  (interactive)
+  (let ((current-line
+         (line-number-at-pos (point))))
+    (if (eql current-line 1)
+        (progn
+          (beginning-of-line)
+          (newline-and-indent)
+          (goto-line 1)
+          (indent-according-to-mode))
+      (progn
+        (goto-line (1- current-line))
+        (end-of-line)
+        (newline-and-indent)))))
 
-
-;; (require 'quelpa)
-;; (require 'quelpa-use-package)
-;; (require 'posframe)
-
-;; (use-package yequake
-;;   :quelpa (yequake :fetcher github :repo "alphapapa/yequake"))
-
-;; (setq yequake-frames
-;;       '(("__scratch" .
-;;          ((name . "__scratch")
-;;           (width . 0.3)
-;;           (height . 0.5)
-;;           (alpha . 0.95)
-;;           (buffer-fns . ("*scratch*"))
-;;           (frame-parameters . (;(undecorated . t)
-;;                                (sticky . t)
-;;                                (unsplittable . t)
-;;                                (no-other-frame . t)
-;;                                (minibuffer . nil)
-;;                                (skip-taskbar . t)
-;;                                (desktop-dont-save . t)
-;;                                (window-system . x)))))))
-
-;; (require 'ivy-posframe)
-
-;; (with-eval-after-load 'ivy
-;;   (setq ivy-initial-inputs-alist nil))
-
-;; (setq ivy-display-function nil)
-;; (push '(counsel-M-x . ivy-posframe-display-at-frame-center) ivy-display-functions-alist)
-;; (push '(ido-find-file . ivy-posframe-display-at-window-center) ivy-display-functions-alist)
-;; (push '(counsel-find-file . ivy-posframe-display-at-window-center) ivy-display-functions-alist)
-;; (push '(complete-symbol . ivy-posframe-display-at-point) ivy-display-functions-alist)
-;; (push '(counsel-describe-variable . ivy-posframe-display-at-point) ivy-display-functions-alist)
-;; (push '(describe-variable . ivy-posframe-display-at-point) ivy-display-functions-alist)
-;; (push '(ivy-switch-buffer . ivy-posframe-display-at-window-center) ivy-display-functions-alist)
-;; (push '(t . ivy-posframe-display) ivy-display-functions-alist)
-
-
-;; (global-set-key (kbd "M-x") 'counsel-M-x)
-;; (global-set-key (kbd "C-x b") 'ivy-switch-buffer)
-;; ;; (global-set-key (kbd "C-x C-f") 'counsel-find-file)
-;; ;;
-;; ;;
-;; (ivy-posframe-enable)
-
-;; (defun ivy-posframe--display (str &optional poshandler)
-;;   "Show STR in ivy's posframe."
-;;   (print poshandler)
-;;   (if (not (ivy-posframe-workable-p))
-;;       (ivy-display-function-fallback str)
-;;     (with-selected-window (ivy--get-window ivy-last)
-;;       ;(ignore-errors (kill-buffer ivy-posframe-buffer))
-;;       (with-current-buffer ivy-posframe-buffer
-;;         (goto-char (point-min)))
-;;       (posframe-show
-;;        ivy-posframe-buffer
-;;        :font ivy-posframe-font
-;;        :string
-;;        (with-current-buffer (get-buffer-create " *Minibuf-1*")
-;;          (let ((point (point))
-;;                (string (if ivy-posframe--ignore-prompt
-;;                            str
-;;                          (concat (buffer-string) "  " str))))
-;;            (add-text-properties (- point 1) point '(face ivy-posframe-cursor) string)
-;;            string))
-;;        :position (point)
-;;        :poshandler poshandler
-;;        :background-color (face-attribute 'ivy-posframe :background)
-;;        :foreground-color (face-attribute 'ivy-posframe :foreground)
-;;        :height (or ivy-posframe-height ivy-height)
-;;        :width (if (eq poshandler 'osframe-poshandler-window-bottom-left-corner)
-;;                   (window-width)
-;;                 (or ivy-posframe-width (/ (window-width) 2)))
-;;        :min-height (or ivy-posframe-min-height 10)
-;;        :min-width (or ivy-posframe-min-width 50)
-;;        :internal-border-width ivy-posframe-border-width
-;;        :override-parameters ivy-posframe-parameters))))
-
-;; (use-package company-posframe
-;;   :quelpa (company-posframe :fetcher github :repo "tumashu/company-posframe"))
-;; (require 'company-posframe)
-;; (company-posframe-mode 1)
+(global-set-key [C-return] 'insert-newline-before-line)
