@@ -15,6 +15,7 @@
     ("#06989A" . "#34E2E2")
     ("#D3D7CF" . "#EEEEEC")])
  '(blink-cursor-mode nil)
+ '(consult-dir-project-list-function 'consult-dir-projectile-dirs)
  '(custom-enabled-themes '(deeper-blue))
  '(dashboard-items
    '((recents . 10)
@@ -39,10 +40,12 @@
  '(lsp-enable-symbol-highlighting nil)
  '(lsp-headerline-breadcrumb-enable nil)
  '(max-mini-window-height 1)
+ '(mini-frame-create-lazy nil)
+ '(mini-frame-resize t)
  '(native-comp-async-report-warnings-errors 'silent)
  '(ns-command-modifier 'control)
  '(package-selected-packages
-   '(centaur-tabs eldoc-box mini-frame origami :origami dired-collapse dired-subtree all-the-icons-dired grip-mode envrc magit evil company-quickhelp company-posframe company go-mode go-projectile delight doom-themes doom-modeline caddyfile-mode yaml-mode yaml gitignore-mode swiper ivy ivy-xref dumb-jump diminish web-mode elixir-mode iedit bazel diff-hl treemacs treemacs-projectile rg exec-path-from-shell vterm dashboard lsp-mode undo-fu use-package projectile erlang good-scroll))
+   '(consult-dir counsel consult marginalia orderless selectrum crm-custom ido-completing-read+ amx ido-grid-mode ido-vertical-mode centaur-tabs eldoc-box mini-frame origami :origami dired-collapse dired-subtree all-the-icons-dired grip-mode envrc magit evil company-quickhelp company-posframe company go-mode go-projectile delight doom-themes doom-modeline caddyfile-mode yaml-mode yaml gitignore-mode swiper ivy ivy-xref dumb-jump diminish web-mode elixir-mode iedit bazel diff-hl treemacs treemacs-projectile rg exec-path-from-shell vterm dashboard lsp-mode undo-fu use-package projectile erlang good-scroll))
  '(show-paren-mode t)
  '(show-paren-priority -50)
  '(show-paren-style 'expression)
@@ -346,6 +349,8 @@ Repeated invocations toggle between the two most recently open buffers."
 (define-key vterm-mode-map [?\C-t] 'er-switch-to-previous-buffer)
 (define-key vterm-mode-map [?\C-d] #'vterm--self-insert)
 (define-key vterm-mode-map [deletechar] #'vterm-send-delete)
+(define-key vterm-mode-map [M-w] #'kill-ring-save)
+(define-key vterm-mode-map (kbd "M-w") #'kill-ring-save)
 (define-key vterm-mode-map [C-up] (ignore-error-wrapper 'windmove-up))
 (define-key vterm-mode-map [C-down] (ignore-error-wrapper 'windmove-down))
 (define-key vterm-mode-map [C-left] (ignore-error-wrapper 'windmove-left))
@@ -370,8 +375,10 @@ Use a prefix argument ARG to indicate creation of a new process instead."
     (unless (buffer-live-p (get-buffer buffer))
       (unless (require 'vterm nil 'noerror)
         (error "Package 'vterm' is not available"))
-      (projectile-with-default-dir project
-        (vterm buffer)))
+      (with-current-buffer (projectile-with-default-dir project
+                             (vterm buffer))
+        (vterm-send-string "bb")
+        (vterm-send-return)))
     (switch-to-buffer buffer)))
 
 (define-key global-map [?\C-t] 'my-projectile-run-vterm)
@@ -450,7 +457,7 @@ Use a prefix argument ARG to indicate creation of a new process instead."
 (add-to-list 'lsp-file-watch-ignored-directories "[/\\\\]vendor\\'")
 
 
-(setq max-mini-window-height 2)
+;; (setq max-mini-window-height 2)
 
 (mini-frame-mode)
 
@@ -470,3 +477,70 @@ Use a prefix argument ARG to indicate creation of a new process instead."
         (newline-and-indent)))))
 
 (global-set-key [C-return] 'insert-newline-before-line)
+
+(defun full-ido ()
+  (interactive)
+  (no-full-emocs)
+  (ido-mode 1)
+  (ido-everywhere 1)
+  (require 'ido-completing-read+)
+  (ido-ubiquitous-mode 1)
+  (require 'amx)
+  (amx-mode 1)
+  (require 'crm-custom)
+  (crm-custom-mode 1)
+  (require 'ido-grid-mode)
+  (ido-grid-mode 1))
+
+(defun no-full-ido ()
+  (interactive)
+  (ido-mode -1)
+  (ido-everywhere -1)
+  (require 'ido-completing-read+)
+  (ido-ubiquitous-mode -1)
+  (require 'amx)
+  (amx-mode -1)
+  (require 'crm-custom)
+  (crm-custom-mode -1)
+  (require 'ido-grid-mode)
+  (ido-grid-mode -1))
+
+(defun full-emocs ()
+  (interactive)
+  (no-full-ido)
+  (require 'selectrum)
+  (selectrum-mode 1)
+  (require 'marginalia)
+  (marginalia-mode 1)
+  (require 'orderless)
+  (setq completion-styles '(substring orderless))
+  (setq consult-project-root-function #'projectile-project-root)
+  )
+
+(defun no-full-emocs ()
+  (interactive)
+  (require 'selectrum)
+  (selectrum-mode -1)
+  (require 'marginalia)
+  (marginalia-mode -1)
+  (require 'orderless)
+  (setq completion-styles '(basic partial-completion emacs22))
+  )
+
+(setq selectrum-refine-candidates-function #'orderless-filter)
+(setq selectrum-highlight-candidates-function #'orderless-highlight-matches)
+
+(global-set-key (kbd "C-s") 'consult-line)
+
+(require 'consult-dir)
+
+(defun pvterm ()
+  (interactive)
+  (let ((consult-dir-default-command #'my-projectile-run-vterm)
+        (consult-dir-sources '(consult-dir--source-project)))
+    (consult-dir)))
+
+(setq consult-preview-key (kbd "C-s"))
+
+(global-set-key (kbd "C-x C-f") #'counsel-find-file)
+(full-emocs)
