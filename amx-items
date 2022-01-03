@@ -1,0 +1,33 @@
+
+;; ----- amx-history -----
+(
+ full-emocs
+ consult-ripgrep
+ mini-frame-mode
+ consult-focus-lines
+ isearch-forward
+ consult-isearch
+ describe-key
+)
+
+;; ----- amx-data -----
+(
+ (customize-group . 9)
+ (ido-ubiquitous-mode . 1)
+ (customize-group-other-window . 1)
+ (amx-mode . 1)
+ (describe-face . 4)
+ (package-list-packages . 1)
+ (vterm . 1)
+ (crm-custom-mode . 2)
+ (full-emocs . 3)
+ (consult-goto-line . 2)
+ (consult-ripgrep . 5)
+ (consult-grep . 1)
+ (consult-isearch . 6)
+ (consult-buffer . 1)
+ (describe-key . 1)
+ (isearch-forward . 1)
+ (consult-focus-lines . 1)
+ (mini-frame-mode . 2)
+)

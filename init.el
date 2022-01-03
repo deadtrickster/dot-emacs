@@ -39,7 +39,6 @@
    '("/Users/ikhaprov/Projects/elixir-ls/release/language_server.sh"))
  '(lsp-enable-symbol-highlighting nil)
  '(lsp-headerline-breadcrumb-enable nil)
- '(max-mini-window-height 1)
  '(mini-frame-create-lazy nil)
  '(mini-frame-resize t)
  '(native-comp-async-report-warnings-errors 'silent)
