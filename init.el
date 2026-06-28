@@ -498,7 +498,10 @@ mouse-3: Next buffer" mouse-face mode-line-highlight local-map
   ;; so explicitly put the per-user tool dirs on `exec-path' too.  Matters for
   ;; gopls (~/go/bin) and cargo/rust-analyzer when launched without the shell
   ;; PATH (see also the Go/Rust tooling).
-  (dolist (dir '("~/.cargo/bin" "~/go/bin" "~/.local/bin" "~/bin"))
+  ;; ~/.local/share/mise/shims: mise-managed runtimes/servers (node + the npm
+  ;; LSP servers, ruff, ...) — so eglot finds them even on a non-shell launch.
+  (dolist (dir '("~/.local/share/mise/shims"
+                 "~/.cargo/bin" "~/go/bin" "~/.local/bin" "~/bin"))
     (let ((p (expand-file-name dir)))
       (when (file-directory-p p)
         (add-to-list 'exec-path p)
@@ -511,6 +514,87 @@ mouse-3: Next buffer" mouse-face mode-line-highlight local-map
   :config
   (unless (server-running-p)
     (server-start)))
+
+;; Monorepo self-install: this .emacs.d repo also vendors the shell + byobu
+;; integration (shell/integration.bash, byobu/*).  Ensure, idempotently at
+;; startup, that ~/.bashrc sources the snippet and that the vendored byobu files
+;; are symlinked into ~/.config/byobu — so a fresh clone wires itself up.
+(defun my-ensure-shell-integration ()
+  "Wire this repo's shell/byobu integration into ~/.bashrc and ~/.config/byobu."
+  (let* ((repo  (expand-file-name user-emacs-directory))
+         (integ (expand-file-name "shell/integration.bash" repo))
+         (bashrc (expand-file-name "~/.bashrc"))
+         (begin "# >>> emacs-managed shell integration >>>")
+         (end   "# <<< emacs-managed shell integration <<<"))
+    ;; 1. Make ~/.bashrc source the vendored integration (append the block once).
+    (when (file-exists-p integ)
+      (let ((content (and (file-readable-p bashrc)
+                          (with-temp-buffer (insert-file-contents bashrc)
+                                            (buffer-string)))))
+        (unless (and content (string-search begin content))
+          (with-temp-buffer
+            (when content (insert content) (unless (bolp) (insert "\n")))
+            (insert "\n" begin "\n"
+                    (format "[ -r %s ] && . %s\n"
+                            (shell-quote-argument integ)
+                            (shell-quote-argument integ))
+                    end "\n")
+            (write-region (point-min) (point-max) bashrc)))))
+    ;; 2. Symlink the vendored byobu config files into ~/.config/byobu.
+    (let ((src-dir (expand-file-name "byobu" repo))
+          (dst-dir (expand-file-name "~/.config/byobu")))
+      (dolist (f '("status" ".tmux.conf" "bin/bb-save-layout"))
+        (let ((src (expand-file-name f src-dir))
+              (dst (expand-file-name f dst-dir)))
+          (when (file-exists-p src)
+            (make-directory (file-name-directory dst) t)
+            (unless (and (file-symlink-p dst)
+                         (string= (file-truename dst) (file-truename src)))
+              (when (file-exists-p dst) (delete-file dst))
+              (make-symbolic-link src dst t))))))
+    ;; 3. Claude "inside Emacs" context overlay (vendored in ~/.emacs.d/claude):
+    ;;    symlink the hook + content into ~/.claude, and register the
+    ;;    SessionStart hook in ~/.claude/settings.json.  The JSON edit is
+    ;;    idempotent and defensive — it leaves the file untouched if our hook is
+    ;;    already there or on any parse/serialize error.
+    (let ((claude-src (expand-file-name "claude" repo)))
+      (when (file-directory-p claude-src)
+        (dolist (pair '(("inside-emacs.md" . "~/.claude/context/_env/inside-emacs.md")
+                        ("hooks/inside-emacs-context" . "~/.claude/hooks/inside-emacs-context")))
+          (let ((src (expand-file-name (car pair) claude-src))
+                (dst (expand-file-name (cdr pair))))
+            (when (file-exists-p src)
+              (make-directory (file-name-directory dst) t)
+              (unless (and (file-symlink-p dst)
+                           (string= (file-truename dst) (file-truename src)))
+                (when (file-exists-p dst) (delete-file dst))
+                (make-symbolic-link src dst t)))))
+        (let ((settings (expand-file-name "~/.claude/settings.json"))
+              (cmd "~/.claude/hooks/inside-emacs-context"))
+          (when (and (file-readable-p settings) (fboundp 'json-parse-string))
+            (condition-case err
+                (let ((text (with-temp-buffer (insert-file-contents settings)
+                                              (buffer-string))))
+                  (unless (string-search cmd text)
+                    ;; parse as hash-tables (native JSON's mutable form), append
+                    ;; our hook to each existing SessionStart matcher, write back.
+                    (let* ((data (json-parse-string text))
+                           (hooks (gethash "hooks" data))
+                           (ss (and hooks (gethash "SessionStart" hooks))))
+                      (when (and ss (> (length ss) 0))
+                        (dotimes (i (length ss))
+                          (let* ((entry (aref ss i))
+                                 (hs (gethash "hooks" entry))
+                                 (mh (make-hash-table :test 'equal)))
+                            (puthash "type" "command" mh)
+                            (puthash "command" cmd mh)
+                            (puthash "hooks" (vconcat hs (vector mh)) entry)))
+                        (with-temp-file settings
+                          (insert (json-serialize data)))))))
+              (error
+               (message "inside-emacs hook: left settings.json alone (%S)" err)))))))))
+
+(add-hook 'after-init-hook #'my-ensure-shell-integration)
 
 ;; Clipboard interop with X11 apps (xfce4-terminal, Chrome, ...).
 ;; `C-y' reads the CLIPBOARD selection; also fall back to the PRIMARY selection
@@ -552,45 +636,47 @@ for a folder to use as the root instead of projectile's project picker."
           (read-directory-name "Use folder as project root: "
                                default-directory nil t)))))
 
-  (defun my-projectile--ghostel-toggle (process cmd &optional arg term extra-env)
-    "Toggle a per-project Ghostel buffer named after PROCESS.
-If the current buffer already IS that buffer, switch back to the
-previous buffer (the quick return).  Otherwise switch to it, creating it
-in the project root with PROJECTILE_PROJECT_NAME exported and running CMD
-(a shell command string) the first time.  TERM, when non-nil, overrides
-`ghostel-term' for the new process; EXTRA-ENV is a list of \"KEY=VALUE\"
-strings prepended to the environment."
+  (defvar my-project-tab-commands
+    '(("claude" . "claude --continue || claude"))
+    "Startup command per byobu tab when the window has to be created.
+Tabs not listed here open as a plain shell.")
+
+  (defvar my-ghostel--return-buffer nil
+    "Code buffer to return to from a project byobu terminal (set on jump-in).")
+
+  (defun my-project-tab (window &optional arg)
+    "Open the project's byobu session and select its WINDOW tab.
+Starts the session with `bb' if it isn't running yet (default tabs:
+claude/shell/git/test, native PTY spawn so `ghostel-send-string' feeds
+the shell), then selects WINDOW — creating it on demand (running the
+command from `my-project-tab-commands', else a plain shell) for sessions
+whose saved layout predates it.  All tabs share one ghostel buffer; a
+a project-aware toggle (`my-ghostel-toggle-terminal') returns you to your code."
     (require 'ghostel)
+    ;; Remember the code buffer we're jumping from, so the toggle returns here.
+    (unless (derived-mode-p 'ghostel-mode)
+      (setq my-ghostel--return-buffer (current-buffer)))
     (let* ((project (my-project-root))
            (name (projectile-project-name project))
-           (ghostel-buffer-name (projectile-generate-process-name process arg project)))
-      (if (string= (buffer-name) ghostel-buffer-name)
-          (switch-to-prev-buffer (selected-window) 1)   ; already here -> bounce back
-        (let* ((fresh (not (get-buffer ghostel-buffer-name)))
-               (default-directory project)
-               (ghostel-term (or term ghostel-term))
-               (process-environment
-                (append extra-env
-                        (cons (concat "PROJECTILE_PROJECT_NAME=" name) process-environment)))
-               ;; `ghostel' switches to the buffer named `ghostel-buffer-name',
-               ;; creating it if needed, and returns it.
-               (buffer (ghostel)))
-          (when (and fresh cmd)
-            ;; ghostel 0.39+ spawns via the native PTY (`ghostel-use-native-pty'),
-            ;; so `ghostel--process' is only a proxy and `process-send-string'
-            ;; never reaches the shell.  `ghostel-send-string' writes the real
-            ;; PTY; the PTY buffers the bytes until the shell reads them.
-            (with-current-buffer buffer
-              (ghostel-send-string (concat cmd "\n"))))
-          buffer))))
+           ;; tmux rewrites '.'/':' in session names to '_'; match that (and `bb')
+           ;; so our `=session:window' targets resolve (e.g. project `.emacs.d').
+           (session (concat "projectile/" (replace-regexp-in-string "[.: ]" "_" name)))
+           (ghostel-buffer-name (projectile-generate-process-name "ghostel" arg project))
+           (fresh (not (get-buffer ghostel-buffer-name)))
+           (default-directory project)
+           (process-environment
+            (cons (concat "PROJECTILE_PROJECT_NAME=" name) process-environment))
+           (buffer (ghostel)))
+      (when fresh
+        (with-current-buffer buffer (ghostel-send-string "bb\n")))
+      (my-projectile--byobu-ensure-window
+       session window project (cdr (assoc window my-project-tab-commands)))
+      buffer))
 
-  (defun my-projectile-run-ghostel (&optional arg)
-    "Toggle the project's byobu terminal (a persistent tmux session via `bb').
-The session lives in the tmux server, so killing the buffer leaves it
-running and the next call reattaches it — one persistent terminal per
-project.  Press the same key again from the terminal to return."
-    (interactive "P")
-    (my-projectile--ghostel-toggle "ghostel" "bb" arg))
+  (defun my-project-tab-test   (&optional arg) "Select the byobu `test' tab."   (interactive "P") (my-project-tab "test"   arg))
+  (defun my-project-tab-claude (&optional arg) "Select the byobu `claude' tab." (interactive "P") (my-project-tab "claude" arg))
+  (defun my-project-tab-git    (&optional arg) "Select the byobu `git' tab."    (interactive "P") (my-project-tab "git"    arg))
+  (defun my-project-tab-shell  (&optional arg) "Select the byobu `shell' tab."  (interactive "P") (my-project-tab "shell"  arg))
 
   (defun my-projectile--byobu-window (session)
     "Return the active tmux window name in SESSION (\"\" if not running)."
@@ -624,47 +710,35 @@ ghostel buffer redraws whichever tab ends up selected."
         (when (and cmd (not (string-empty-p cmd)))
           (call-process "tmux" nil nil nil "send-keys" "-t" tgt cmd "Enter"))))))
 
-  (defun my-projectile-run-claude (&optional arg)
-    "Drop into the project's byobu `claude' tab — the persistent claude living in
-the tmux server (survives killing the buffer / restarting Emacs).  Shares the
-byobu terminal buffer with `my-projectile-run-ghostel' (C-t C-t) and just
-selects the `claude' window: a fresh session is started with `bb' (which opens
-on the claude tab); an existing one has its claude window selected, or it is
-created on demand for projects whose saved layout predates the claude tab.
-Press the same chord again while already on the claude tab to bounce to code."
-    (interactive "P")
-    (require 'ghostel)
-    (let* ((project (my-project-root))
-           (name (projectile-project-name project))
-           ;; tmux rewrites '.'/':' in session names to '_'; match that (and `bb')
-           ;; so our `=session:window' targets resolve (e.g. project `.emacs.d').
-           (session (concat "projectile/" (replace-regexp-in-string "[.: ]" "_" name)))
-           (ghostel-buffer-name (projectile-generate-process-name "ghostel" arg project)))
-      (if (and (string= (buffer-name) ghostel-buffer-name)
-               (string= (my-projectile--byobu-window session) "claude"))
-          (switch-to-prev-buffer (selected-window) 1)   ; already on claude -> bounce
-        (let* ((fresh (not (get-buffer ghostel-buffer-name)))
-               (default-directory project)
-               (process-environment
-                (cons (concat "PROJECTILE_PROJECT_NAME=" name) process-environment))
-               (buffer (ghostel)))
-          (when fresh
-            (with-current-buffer buffer (ghostel-send-string "bb\n")))
-          (my-projectile--byobu-ensure-window
-           session "claude" project "claude --continue || claude")
-          buffer))))
+  (defun my-ghostel-toggle-terminal ()
+    "Toggle between your code and THIS project's byobu terminal.
+From a ghostel terminal, return to the exact buffer you jumped from (not
+the window's previous buffer, which may belong to another project).  From
+code, switch to the current project's terminal buffer (its active tab),
+remembering this buffer to come back to."
+    (interactive)
+    (if (derived-mode-p 'ghostel-mode)
+        (if (and (buffer-live-p my-ghostel--return-buffer)
+                 (not (eq my-ghostel--return-buffer (current-buffer))))
+            (switch-to-buffer my-ghostel--return-buffer)
+          (switch-to-prev-buffer (selected-window) 1))
+      (setq my-ghostel--return-buffer (current-buffer))
+      (let* ((project (my-project-root))
+             (buf (get-buffer (projectile-generate-process-name "ghostel" nil project))))
+        (if buf (switch-to-buffer buf) (my-project-tab "shell")))))
 
-  ;; C-t prefix.  Sub-keys are Control-chords too, so you can hold Ctrl the whole
-  ;; time: C-t C-t = byobu terminal, C-t C-c = byobu claude tab.  Plain t/c also
-  ;; work.  Each launcher bounces back to your code when pressed from its target.
+  ;; C-t is a real PREFIX keymap (not a command — a command can't host a chord).
+  ;; C-t C-t toggles code<->this project's terminal; C-t C-c/C-g/C-s pick a tab.
+  ;; (A C-g *after* the C-t prefix is a normal key, not a quit, so it binds fine.)
   (defvar my-ghostel-prefix-map
     (let ((map (make-sparse-keymap)))
-      (define-key map (kbd "t")   #'my-projectile-run-ghostel)
-      (define-key map (kbd "C-t") #'my-projectile-run-ghostel)
-      (define-key map (kbd "c")   #'my-projectile-run-claude)
-      (define-key map (kbd "C-c") #'my-projectile-run-claude)
+      (dolist (b '(("C-t" . my-ghostel-toggle-terminal) ("t" . my-ghostel-toggle-terminal)
+                   ("C-c" . my-project-tab-claude)       ("c" . my-project-tab-claude)
+                   ("C-g" . my-project-tab-git)          ("g" . my-project-tab-git)
+                   ("C-s" . my-project-tab-shell)        ("s" . my-project-tab-shell)))
+        (define-key map (kbd (car b)) (cdr b)))
       map)
-    "Prefix map under \\`C-t' for project terminals.")
+    "Prefix map bound to \\`C-t' (in the global map and `ghostel-mode-map').")
   :config
   (global-set-key (kbd "C-t") my-ghostel-prefix-map)
   (define-key projectile-mode-map (kbd "s-p") 'projectile-command-map)
@@ -757,6 +831,11 @@ Press the same chord again while already on the claude tab to bounce to code."
   ;; copy-mode (C-c C-t) can't be used here — it unpins tmux's alt-screen status
   ;; line.  Off by default for security; we accept the risk for the clipboard win.
   (ghostel-enable-osc52 t)
+  ;; Let C-t pass through to Emacs instead of being sent to the shell, so our
+  ;; C-t prefix (toggle / tab switch, bound in `ghostel-mode-map') works inside
+  ;; the terminal.  Without this, ghostel's semi-char input map forwards C-t to
+  ;; the PTY.  (The :set on this defcustom rebuilds the input keymap.)
+  (ghostel-keymap-exceptions '("C-c" "C-x" "C-u" "C-h" "M-x" "M-:" "C-\\" "C-t"))
   :custom-face
   ;; The installed ghostel palette inherits `ansi-color-*' (red3, green3, …),
   ;; but the theme customizes `term-color-*'.  Point the palette at the themed
@@ -780,8 +859,8 @@ Press the same chord again while already on the claude tab to bounce to code."
   (ghostel-color-bright-white   ((t (:inherit term-color-white))))
   :config
   ;; ghostel-max-scrollback defaults to 5MB — fine as-is.
-  ;; C-t inside a terminal is the same prefix as everywhere else, so C-t C-t /
-  ;; C-t C-c toggle the byobu/claude buffers (and bounce you back) from here too.
+  ;; C-t inside a terminal is the same prefix as everywhere else: C-t C-t toggles
+  ;; back to your code, C-t C-c/g/s pick a byobu tab.
   (define-key ghostel-mode-map [?\C-t] my-ghostel-prefix-map)
   (define-key ghostel-mode-map [M-w] #'kill-ring-save)
   (define-key ghostel-mode-map (kbd "M-w") #'kill-ring-save)
@@ -845,21 +924,131 @@ Press the same chord again while already on the claude tab to bounce to code."
   :custom
   (eglot-ignored-server-capabilities '())
   :hook
-  (elixir-mode . eglot-ensure)
+  ((elixir-mode elixir-ts-mode heex-ts-mode) . eglot-ensure)
   (erlang-mode . eglot-ensure)
   (go-mode . eglot-ensure)
   (sh-mode . eglot-ensure)
+  ((typescript-ts-mode tsx-ts-mode js-ts-mode) . eglot-ensure)
+  (python-ts-mode . eglot-ensure)
+  ((css-ts-mode web-mode) . eglot-ensure)
+  ((cmake-ts-mode cmake-mode) . eglot-ensure)
+  ((c-mode c-ts-mode c++-mode c++-ts-mode) . eglot-ensure)
+  (sql-mode . eglot-ensure)
   :config
-  (add-to-list 'eglot-server-programs '(elixir-mode "/home/dead/bin/elixir-ls/language_server.sh"))
+  ;; Servers eglot doesn't know by default (it already knows
+  ;; typescript-language-server, pyright, cmake-language-server).
+  (add-to-list 'eglot-server-programs
+               '((elixir-ts-mode heex-ts-mode elixir-mode)
+                 "/home/dead/bin/elixir-ls/language_server.sh"))
   (add-to-list 'eglot-server-programs '(erlang-mode "/home/dead/bin/elp" "server"))
-  (add-to-list 'exec-path "/home/dead/Projects/elixir-ls")
+  (add-to-list 'eglot-server-programs '(sql-mode "sqls"))
+  ;; Tailwind LSP for templates/CSS (class completion + linting).
+  (add-to-list 'eglot-server-programs
+               '((web-mode css-ts-mode css-mode html-mode html-ts-mode mhtml-mode)
+                 "tailwindcss-language-server" "--stdio"))
   (add-to-list 'recentf-exclude "\\*EGLOT ")
   (with-eval-after-load 'consult
     (add-to-list 'consult-buffer-filter "\\*EGLOT "))
   (setq eldoc-echo-area-prefer-doc-buffer t
         eldoc-echo-area-use-multiline-p nil))
 
-(use-package elixir-mode)
+;; ---------------------------------------------------------------------------
+;; Modern language setups.  Pattern (matching rust above): built-in tree-sitter
+;; modes + eglot (servers hooked in the `eglot' block) + apheleia format-on-save.
+;; LSP servers/runtimes are installed via mise (node/erlang/elixir) + go/pip.
+;; ---------------------------------------------------------------------------
+
+;; BEAM: Elixir (+ HEEx templates) and Erlang.  elixir-ts-mode/heex-ts-mode are
+;; built-in tree-sitter modes; elixir-mode stays as a fallback.
+(use-package elixir-ts-mode
+  :ensure nil
+  :mode (("\\.exs?\\'" . elixir-ts-mode)
+         ("mix\\.lock\\'" . elixir-ts-mode)
+         ("\\.heex\\'" . heex-ts-mode)))
+
+(use-package elixir-mode :defer t)
+
+(use-package erlang
+  :mode (("\\.erl\\'" . erlang-mode)
+         ("\\.hrl\\'" . erlang-mode)
+         ("\\(rebar\\.config\\|relx\\.config\\|sys\\.config\\)\\'" . erlang-mode)))
+
+;; TypeScript / JavaScript / React.  The tsx grammar parses JSX, so .jsx/.tsx
+;; both use tsx-ts-mode; plain .js/.ts use the ts-modes when grammars are ready.
+(use-package typescript-ts-mode
+  :ensure nil
+  :mode (("\\.ts\\'"  . typescript-ts-mode)
+         ("\\.mts\\'" . typescript-ts-mode)
+         ("\\.cts\\'" . typescript-ts-mode)
+         ("\\.tsx\\'" . tsx-ts-mode)
+         ("\\.jsx\\'" . tsx-ts-mode)))
+
+(use-package js
+  :ensure nil
+  :init
+  (when (and (require 'treesit nil t) (treesit-ready-p 'javascript t))
+    (dolist (m '((js-mode . js-ts-mode) (javascript-mode . js-ts-mode)))
+      (add-to-list 'major-mode-remap-alist m))))
+
+;; Python — remap to the built-in tree-sitter mode; server is pyright (eglot
+;; default), formatting is ruff (set in the apheleia block).
+(use-package python
+  :ensure nil
+  :init
+  (when (and (require 'treesit nil t) (treesit-ready-p 'python t))
+    (add-to-list 'major-mode-remap-alist '(python-mode . python-ts-mode))))
+
+;; CSS -> css-ts-mode; CMake -> built-in cmake-ts-mode.
+(use-package css-mode
+  :ensure nil
+  :init
+  (when (and (require 'treesit nil t) (treesit-ready-p 'css t))
+    (add-to-list 'major-mode-remap-alist '(css-mode . css-ts-mode))))
+
+(use-package cmake-ts-mode
+  :ensure nil
+  :mode (("CMakeLists\\.txt\\'" . cmake-ts-mode)
+         ("\\.cmake\\'" . cmake-ts-mode)))
+
+;; C / C++ -> built-in tree-sitter modes; server is clangd (eglot default),
+;; formatting is clang-format (apheleia default for these modes).
+(use-package cc-mode
+  :ensure nil
+  :custom
+  (c-basic-offset 4)            ; indent step for the classic c-mode / c++-mode
+  (c-ts-mode-indent-offset 4)   ; indent step for c-ts-mode / c++-ts-mode
+  :hook ((c-mode-common c-ts-base-mode) . (lambda () (setq tab-width 4)))
+  :init
+  (when (and (require 'treesit nil t) (treesit-ready-p 'c t))
+    (add-to-list 'major-mode-remap-alist '(c-mode . c-ts-mode)))
+  (when (and (require 'treesit nil t) (treesit-ready-p 'cpp t))
+    (add-to-list 'major-mode-remap-alist '(c++-mode . c++-ts-mode))))
+
+;; SQL — keep the built-in sql-mode (interactive REPLs to psql/sqlite/…) and add
+;; smart indentation; the LSP server is sqls (registered in the `eglot' block).
+(use-package sql-indent
+  :hook (sql-mode . sqlind-minor-mode))
+
+;; Emmet abbreviations (C-j to expand) in markup/CSS/JSX buffers.
+(use-package emmet-mode
+  :hook ((web-mode html-mode html-ts-mode mhtml-mode css-mode css-ts-mode
+          tsx-ts-mode) . emmet-mode))
+
+;; Format on save.  apheleia ships the formatter defs: prettier for
+;; js/ts/tsx/css/html/json, ruff for Python, etc.  Runs async, off the main
+;; buffer, so saves stay snappy.
+(use-package apheleia
+  :diminish apheleia-mode
+  :hook (after-init . apheleia-global-mode)
+  :config
+  ;; Use ruff (installed) for Python instead of the default black.
+  (setf (alist-get 'python-ts-mode apheleia-mode-alist) '(ruff-isort ruff)
+        (alist-get 'python-mode    apheleia-mode-alist) '(ruff-isort ruff))
+  ;; No format-on-save for C/C++: clang-format ignores Emacs's indent vars and
+  ;; reformats aggressively, fighting the 4-space editor indent.  Add a project
+  ;; .clang-format if you want full formatting there.
+  (dolist (m '(c-mode c++-mode c-ts-mode c++-ts-mode))
+    (setq apheleia-mode-alist (assq-delete-all m apheleia-mode-alist))))
 
 (use-package bazel)
 
@@ -912,6 +1101,28 @@ Press the same chord again while already on the claude tab to bounce to code."
 (use-package cargo-mode
   :hook ((rust-ts-mode rust-mode) . cargo-minor-mode))
 
+;; Common Lisp (SBCL-only) via SLY — not eglot.  SLY is the CL IDE layer
+;; (REPL/inspector/debugger over slynk); `M-x sly' starts SBCL + slynk.
+;; Quicklisp is loaded by ~/.sbclrc, so (ql:quickload ...) works in the REPL.
+(use-package sly
+  :custom
+  (inferior-lisp-program "sbcl")
+  :config
+  (add-to-list 'auto-mode-alist '("\\.cl\\'" . lisp-mode)))
+
+;; Structural editing + nested-paren colors for every Lisp (CL, Elisp, REPL).
+(use-package paredit
+  :hook ((emacs-lisp-mode lisp-mode lisp-data-mode lisp-interaction-mode
+          sly-mrepl-mode)
+         . enable-paredit-mode))
+
+;; Dim parens to a low-contrast gray (the `parenthesis' face) so the symbols
+;; read cleanly, instead of coloring each nesting level.  All Lisps + SLY REPL.
+(use-package paren-face
+  :hook ((emacs-lisp-mode lisp-mode lisp-data-mode lisp-interaction-mode
+          sly-mrepl-mode)
+         . paren-face-mode))
+
 (use-package markdown-mode)
 
 (use-package magit
@@ -931,21 +1142,25 @@ Press the same chord again while already on the claude tab to bounce to code."
   :config
   (setq treesit-language-source-alist
         '((bash "https://github.com/tree-sitter/tree-sitter-bash")
+          (c "https://github.com/tree-sitter/tree-sitter-c" "v0.21.4")
+          (cpp "https://github.com/tree-sitter/tree-sitter-cpp" "v0.22.0")
           (cmake "https://github.com/uyha/tree-sitter-cmake")
-          (css "https://github.com/tree-sitter/tree-sitter-css")
+          (css "https://github.com/tree-sitter/tree-sitter-css" "v0.21.0")
           (elisp "https://github.com/Wilfred/tree-sitter-elisp")
           ;; Pin to an ABI-14 tag — this Emacs supports tree-sitter ABI 13-14,
           ;; and current tree-sitter-go is ABI 15 (see the rust pin above).
           (go "https://github.com/tree-sitter/tree-sitter-go" "v0.21.0")
           (html "https://github.com/tree-sitter/tree-sitter-html")
-          (javascript "https://github.com/tree-sitter/tree-sitter-javascript" "master" "src")
+          (javascript "https://github.com/tree-sitter/tree-sitter-javascript" "v0.21.4" "src")
           (json "https://github.com/tree-sitter/tree-sitter-json")
           (make "https://github.com/alemuller/tree-sitter-make")
           (markdown "https://github.com/ikatyang/tree-sitter-markdown")
-          (python "https://github.com/tree-sitter/tree-sitter-python")
+          (python "https://github.com/tree-sitter/tree-sitter-python" "v0.21.0")
           (toml "https://github.com/tree-sitter/tree-sitter-toml")
           (tsx "https://github.com/tree-sitter/tree-sitter-typescript" "master" "tsx/src")
           (typescript "https://github.com/tree-sitter/tree-sitter-typescript" "master" "typescript/src")
+          (elixir "https://github.com/elixir-lang/tree-sitter-elixir")
+          (heex "https://github.com/phoenixframework/tree-sitter-heex" "v0.7.0")
           (yaml "https://github.com/ikatyang/tree-sitter-yaml"))))
 
 (use-package window

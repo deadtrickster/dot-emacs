@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Persist the tab (window) names of projectile/* byobu sessions so `bb' can
+# restore them per project.  Invoked with no args from tmux window hooks (see
+# ~/.config/byobu/.tmux.conf); writes one file per session under
+# ~/.config/byobu/layouts/<session-with-slashes-as-__>.
+set -u
+
+dir="${BYOBU_CONFIG_DIR:-$HOME/.config/byobu}/layouts"
+mkdir -p "$dir"
+
+save_one() {
+    local session="$1"
+    case "$session" in
+        projectile/*) ;;
+        *) return 0 ;;   # only manage projectile sessions
+    esac
+    tmux list-windows -t "=$session" -F '#{window_name}' \
+        > "$dir/${session//\//__}" 2>/dev/null
+}
+
+if [[ $# -gt 0 && -n "${1:-}" ]]; then
+    save_one "$1"
+else
+    # No session given (the usual hook case): save every projectile session.
+    while IFS= read -r s; do
+        save_one "$s"
+    done < <(tmux list-sessions -F '#{session_name}' 2>/dev/null)
+fi

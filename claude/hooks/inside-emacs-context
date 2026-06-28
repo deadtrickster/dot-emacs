@@ -1,0 +1,13 @@
+#!/bin/bash
+# SessionStart hook: when Claude is running inside the Emacs/ghostel terminal,
+# inject context telling it so (editor is emacsclient, C-t navigation, e/open/
+# say helpers, ...).  No-op in a plain terminal.
+#
+# Interim home: ~/.claude.  Migrates into the ~/.claude-mind store later
+# (see ~/.emacs.d/docs/context-overlays.md, overlay #4).
+case "$INSIDE_EMACS" in
+    *ghostel*|*emacs*) ;;
+    *) exit 0 ;;
+esac
+ctx="$HOME/.claude/context/_env/inside-emacs.md"
+[ -f "$ctx" ] && cat "$ctx"

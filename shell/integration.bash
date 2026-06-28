@@ -1,0 +1,171 @@
+# shell/integration.bash --- Emacs/ghostel/byobu shell integration (vendored)
+#
+# Sourced from ~/.bashrc via an emacs-managed block (see `my-ensure-shell-
+# integration' in init.el, which also symlinks the byobu config below).  Keep
+# this self-contained and idempotent so it can be sourced from any interactive
+# bash.  Everything here is version-controlled in the .emacs.d repo.
+
+# mise: polyglot runtime/tool version manager (node, erlang, elixir, ...).
+# Activation puts mise-managed tool shims on PATH and enables per-project
+# version switching (mise.toml / .tool-versions), much like direnv does for env.
+if [ -x "$HOME/.local/bin/mise" ]; then
+    eval "$("$HOME/.local/bin/mise" activate bash)"
+fi
+
+# direnv: load each project's .envrc on `cd', so the byobu tabs get the same
+# per-project environment as Emacs (via envrc).  `direnv allow' once to trust it.
+if command -v direnv >/dev/null 2>&1; then
+    eval "$(direnv hook bash)"
+fi
+
+# git-aware prompt: show branch + working-tree state in PS1.  Injected (bold
+# yellow, before the prompt char) into whatever PS1 ~/.bashrc already built —
+# this file is sourced last, so the stock prompt stays untouched upstream.
+if [ -f /usr/lib/git-core/git-sh-prompt ]; then
+    . /usr/lib/git-core/git-sh-prompt
+    GIT_PS1_SHOWDIRTYSTATE=1      # '*' unstaged, '+' staged
+    GIT_PS1_SHOWSTASHSTATE=1      # '$' stashed
+    GIT_PS1_SHOWUNTRACKEDFILES=1  # '%' untracked
+    GIT_PS1_SHOWUPSTREAM=auto     # '<' '>' '=' vs upstream
+    case "$PS1" in
+        *__git_ps1*) ;;  # already injected (idempotent if sourced twice)
+        *) PS1=${PS1/'\$ '/'\[\033[01;33m\]$(__git_ps1 " (%s)")\[\033[00m\]\$ '} ;;
+    esac
+fi
+
+# --- byobu + Emacs/ghostel projectile integration -----------------------------
+# byobu reads its config from $BYOBU_CONFIG_DIR; the customized files there
+# (status, .tmux.conf, bin/bb-save-layout) are symlinks into this repo's byobu/.
+export BYOBU_CONFIG_DIR="$HOME/.config/byobu"
+
+# Default tabs for a brand-new project session, and the command each starts with
+# (empty = just a shell).  On restore, only these known names get their command
+# re-run; any custom tab you added comes back as a plain shell.
+__BB_DEFAULT_WINDOWS=(claude shell git test)
+declare -A __BB_WINDOW_CMD=(
+    [claude]='claude --continue || claude'
+    [git]='git status'
+)
+
+__bb_layout_file() {   # $1 = session name -> path to its saved layout file
+    local dir="${BYOBU_CONFIG_DIR:-$HOME/.config/byobu}/layouts"
+    mkdir -p "$dir"
+    printf '%s/%s' "$dir" "${1//\//__}"
+}
+
+# `bb' attaches (or creates) the project's persistent byobu/tmux session.  Emacs
+# C-t launchers send `bb' into a ghostel buffer; it also works by hand from any
+# shell (a separate terminal, VS Code, a subdirectory), deriving the project
+# name from the git top-level so it lands in the SAME session as Emacs.
+bb() {
+    local rawproj="${PROJECTILE_PROJECT_NAME:-$(basename "$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || echo "$PWD")")}"
+    # tmux rewrites '.' and ':' in a session name to '_'; do it ourselves so our
+    # explicit `=session:window' targets match the stored name (e.g. `.emacs.d').
+    local proj="${rawproj//[.: ]/_}"
+    local session="projectile/$proj"
+
+    # Already running?  Just attach — its windows live in the tmux server.
+    if tmux has-session -t "=$session" 2>/dev/null; then
+        tmux set-option -t "$session" @project "$rawproj" 2>/dev/null
+        byobu attach -t "$session"
+        return
+    fi
+
+    # Fresh session: tab names from the saved per-project layout, else defaults.
+    local file; file="$(__bb_layout_file "$session")"
+    local -a names
+    if [[ -s "$file" ]]; then
+        mapfile -t names < "$file"
+    else
+        names=("${__BB_DEFAULT_WINDOWS[@]}")
+    fi
+    [[ ${#names[@]} -eq 0 ]] && names=("${__BB_DEFAULT_WINDOWS[@]}")
+
+    local first=1 name cmd
+    for name in "${names[@]}"; do
+        [[ -z "$name" ]] && continue
+        if (( first )); then
+            # Create through byobu-tmux so a fresh server loads byobu's profile
+            # (-f ...); plain tmux would come up with the stock green status bar.
+            byobu-tmux new-session -d -s "$session" -n "$name" -c "$PWD"
+            first=0
+        else
+            tmux new-window -t "=$session" -n "$name" -c "$PWD"
+        fi
+        # Pin the tab name so tmux/apps don't auto-rename it to the running cmd.
+        tmux set-window-option -t "=$session:$name" automatic-rename off >/dev/null
+        tmux set-window-option -t "=$session:$name" allow-rename off >/dev/null
+        cmd="${__BB_WINDOW_CMD[$name]}"
+        [[ -n "$cmd" ]] && tmux send-keys -t "=$session:$name" "$cmd" Enter
+    done
+    tmux select-window -t "=$session:${names[0]}"
+    tmux set-option -t "$session" @project "$rawproj" 2>/dev/null
+    byobu attach -t "$session"
+}
+
+# Reset a project's tabs to the defaults — forgets the saved layout and kills the
+# session (asks first); reopen with `bb' (or C-t in Emacs) for fresh defaults.
+bb-reset() {
+    local session="projectile/${PROJECTILE_PROJECT_NAME:-$(basename "$PWD")}"
+    local ans
+    read -rp "Reset '$session' to default tabs? Kills the session. [y/N] " ans
+    case "$ans" in
+        [yY]*) ;;
+        *) echo "aborted"; return 1 ;;
+    esac
+    rm -f "$(__bb_layout_file "$session")"
+    echo "Cleared saved layout for '$session'."
+    if tmux has-session -t "=$session" 2>/dev/null; then
+        echo "Killing it — reopen with 'bb' (or C-t in Emacs) for default tabs."
+        tmux kill-session -t "=$session" 2>/dev/null
+    fi
+}
+
+# ghostel / Emacs integration.  Active in a bare ghostel shell AND inside the
+# byobu session `bb' attaches (INSIDE_EMACS=ghostel is inherited by byobu panes).
+#   * emacsclient (a unix socket) for the editor + "open in Emacs" helpers — it
+#     pierces tmux, so these work identically inside or outside byobu.
+#   * OSC escape sequences for directory tracking — tmux swallows these unless
+#     passthrough-wrapped (see __ghostel_emit) and `set -g allow-passthrough on'.
+if [[ "${INSIDE_EMACS%%,*}" = 'ghostel' || "$TERM" = 'xterm-ghostty' ]]; then
+
+    # Editor: git commit / `git rebase -i' / any $EDITOR child opens in the outer
+    # Emacs and blocks until you finish (C-c C-c) / cancel (C-c C-k).
+    if command -v emacsclient >/dev/null 2>&1; then
+        export EDITOR='emacsclient'
+        export VISUAL='emacsclient'
+        export GIT_EDITOR='emacsclient'
+        export GIT_SEQUENCE_EDITOR='emacsclient'
+
+        # Non-blocking "open in Emacs"; resolve to absolute paths.
+        _ec_open() {
+            local args=() f
+            for f in "${@:-.}"; do args+=("$(realpath -m -- "$f")"); done
+            emacsclient -n -- "${args[@]}"
+        }
+        e()     { _ec_open "$@"; }
+        emacs() { _ec_open "$@"; }
+        open()  { _ec_open "$@"; }
+    fi
+
+    # Directory tracking (OSC 7).  Only needed inside tmux/byobu, passthrough-wrapped.
+    if [[ -n "$TMUX" ]]; then
+        __ghostel_emit() { printf '\ePtmux;\e\e]%s\a\e\\' "$1"; }
+        __ghostel_osc7() { __ghostel_emit "7;file://${HOSTNAME}${PWD}"; }
+        ghostel_cmd() {
+            local payload='' arg
+            for arg in "$@"; do
+                payload="$payload\"$(printf '%s' "$arg" | sed -e 's|\\|\\\\|g' -e 's|"|\\"|g')\" "
+            done
+            __ghostel_emit "51;E${payload}"
+        }
+        case ";${PROMPT_COMMAND};" in
+            *";__ghostel_osc7;"*) ;;
+            *) PROMPT_COMMAND="__ghostel_osc7;${PROMPT_COMMAND}" ;;
+        esac
+        __ghostel_osc7
+    fi
+
+    say() { ghostel_cmd message "%s" "$*"; }
+fi
+# ------------------------------------------------------------------------------
