@@ -111,6 +111,18 @@
   (native-comp-async-report-warnings-errors 'silent)
   ;; (split-window-preferred-function nil) ; Disable automatic window splitting
   ;; (delete-window-preferred-function nil) ; Disable automatic window deletion
+  :custom-face
+  ;; deeper-blue's mode-line is gray75 — a bright bar that pulls the eye off the
+  ;; buffer text.  Calm it to a dark slate (the byobu active-tab style below uses
+  ;; the same colour), with inactive windows dimmer still.
+  (mode-line ((t (:background "#2a2f3d" :foreground "#a9b1c2"))))
+  (mode-line-active ((t (:background "#2a2f3d" :foreground "#a9b1c2"))))
+  (mode-line-inactive ((t (:background "#1e212b" :foreground "#5e6573"))))
+  ;; deeper-blue colours the buffer name `blue4' (invisible on the slate), and
+  ;; envrc's "none" indicator inherits the bright `warning' yellow — calm both.
+  ;; The buffer name uses the same foreground as the byobu active window name.
+  (mode-line-buffer-id ((t (:foreground "#e3e7ee" :weight bold))))
+  (envrc-mode-line-none-face ((t (:foreground "#75808f" :weight normal))))
   :config
   ;; C-t is a prefix map (set up in the `projectile' block): C-t C-t = byobu
   ;; terminal, C-t C-c = claude.  Each toggles, so the same chord returns you.
