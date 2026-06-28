@@ -806,6 +806,44 @@ otherwise open a type-to-filter list seeded with the key (prefix-first, so
           (when (and (stringp choice) (not (string-empty-p choice)))
             (my-project-tab choice))))))
 
+  (defun my-byobu--session (project)
+    "tmux session name for PROJECT, sanitized like `bb' (./: -> _)."
+    (concat "projectile/"
+            (replace-regexp-in-string "[.: ]" "_" (projectile-project-name project))))
+
+  (defun my-byobu--current-window (project)
+    "Name of the active window in PROJECT's byobu session, or nil.
+Reads `list-windows' and picks the one flagged active — `display-message'
+returns nothing for a session with no attached client."
+    (let ((lines (split-string
+                  (with-output-to-string
+                    (call-process "tmux" nil standard-output nil "list-windows"
+                                  "-t" (concat "=" (my-byobu--session project))
+                                  "-F" "#{window_active} #{window_name}"))
+                  "\n" t)))
+      (catch 'found
+        (dolist (l lines)
+          (when (string-prefix-p "1 " l)
+            (throw 'found (substring l 2)))))))
+
+  (defun my-byobu-new-window (name)
+    "Create byobu window NAME in the current project's session and switch to it."
+    (interactive "sNew byobu window: ")
+    (setq name (string-trim name))
+    (unless (string-empty-p name)
+      (my-project-tab name)))
+
+  (defun my-byobu-close-window (name)
+    "Kill byobu window NAME in the current project's session (default: current)."
+    (interactive
+     (let ((project (my-project-root)))
+       (list (completing-read "Close byobu window: " (my-byobu--window-names project)
+                              nil t nil nil (my-byobu--current-window project)))))
+    (when (and (stringp name) (not (string-empty-p name))
+               (y-or-n-p (format "Kill byobu window %s? " name)))
+      (call-process "tmux" nil nil nil "kill-window"
+                    "-t" (concat "=" (my-byobu--session (my-project-root)) ":" name))))
+
   (defun my-projectile--byobu-window (session)
     "Return the active tmux window name in SESSION (\"\" if not running)."
     (string-trim
@@ -865,6 +903,8 @@ remembering this buffer to come back to."
       (define-key map (kbd "C-c") #'my-project-tab-claude)
       (define-key map (kbd "C-g") #'my-project-tab-git)
       (define-key map (kbd "C-s") #'my-project-tab-shell)
+      (define-key map (kbd "C-n") #'my-byobu-new-window)    ; new window (ask name)
+      (define-key map (kbd "C-k") #'my-byobu-close-window)  ; close (default: current)
       ;; Any other key (a plain letter) -> type-to-filter window switch, seeded
       ;; with that key: C-t t -> test, C-t <type a name> -> that window.  So the
       ;; mnemonic chords are kept AND every window (incl. test/custom) is one
