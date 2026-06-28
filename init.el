@@ -750,10 +750,29 @@ for a folder to use as the root instead of projectile's project picker."
     (require 'projectile)
     (or (let ((projectile-project-root-cache (make-hash-table :test 'equal)))
           (projectile-project-root default-directory))
-        (file-name-as-directory
-         (expand-file-name
-          (read-directory-name "Use folder as project root: "
-                               default-directory nil t)))))
+        (my-project--pick-root)))
+
+  (defun my-project--pick-root ()
+    "Ask for a project root, listing projects open in this Emacs session first,
+then other known projects, then a browse-for-folder escape.  Order preserved."
+    (require 'projectile)
+    (let* ((open  (projectile-open-projects))
+           (known (seq-remove (lambda (p) (member p open))
+                              (projectile-known-projects)))
+           (browse "Browse for a folder…")
+           (cands (append open known (list browse)))
+           (choice (completing-read
+                    "Project root (open projects first): "
+                    (lambda (str pred action)
+                      (if (eq action 'metadata)
+                          '(metadata (display-sort-function . identity))
+                        (complete-with-action action cands str pred)))
+                    nil t)))
+      (file-name-as-directory
+       (expand-file-name
+        (if (equal choice browse)
+            (read-directory-name "Use folder as project root: " default-directory nil t)
+          choice)))))
 
   (defvar my-project-tab-commands
     '(("claude" . "claude --continue || claude"))
@@ -761,25 +780,51 @@ for a folder to use as the root instead of projectile's project picker."
 Tabs not listed here open as a plain shell.")
 
   (defvar my-ghostel--return-buffer nil
-    "Code buffer to return to from a project byobu terminal (set on jump-in).")
+    "Code buffer the byobu toggle returns to.  Tracked automatically by
+`my-ghostel--remember-buffer'; don't set it from individual switch commands.")
+
+  (defun my-ghostel--remember-buffer (&rest _)
+    "Record the selected window's buffer as the byobu return target, unless it's
+a terminal or the minibuffer.  Hung on the window-change hooks so EVERY route to
+the terminal (toggle, the `C-t' tab keys, citation, plain window moves) returns
+to wherever you actually were — no per-call-site bookkeeping."
+    (let ((buf (window-buffer (selected-window))))
+      (unless (or (minibufferp buf)
+                  (provided-mode-derived-p (buffer-local-value 'major-mode buf)
+                                           'ghostel-mode))
+        (setq my-ghostel--return-buffer buf))))
+  (add-hook 'window-selection-change-functions #'my-ghostel--remember-buffer)
+  (add-hook 'window-buffer-change-functions    #'my-ghostel--remember-buffer)
+
+  (defvar-local my-ghostel--cited-session nil
+    "Sticky byobu-session association for an unprojected buffer.  Set when you
+cite from here with `C-t C-y'; `C-t C-t' then jumps to that session's terminal
+instead of asking for a folder.  Lives for the buffer's lifetime.")
 
   (defun my-byobu--session (project)
     "tmux session name for PROJECT, sanitized like `bb' (./: -> _)."
     (concat "projectile/"
             (replace-regexp-in-string "[.: ]" "_" (projectile-project-name project))))
 
+  (defun my-byobu--ghostel-buffer (session)
+    "The live ghostel buffer attached to SESSION, or nil."
+    (seq-find (lambda (b)
+                (with-current-buffer b
+                  (and (derived-mode-p 'ghostel-mode)
+                       (equal (ignore-errors (my-byobu--session default-directory))
+                              session))))
+              (buffer-list)))
+
   (defun my-project-tab (window &optional arg)
     "Open the project's byobu session and select WINDOW.
-WINDOW is a tab name (string) or a tmux window index (integer).  Starts the
+WINDOW is a tab name (string), a tmux window index (integer), or nil to leave
+the session's active tab as-is (just show the terminal).  Starts the
 session with `bb' if needed (default tabs claude/shell/git/test); a string
 names a tab (created on demand from `my-project-tab-commands', else a plain
 shell), an integer selects that window index — unambiguous when names clash.
 All tabs share one ghostel buffer; `my-ghostel-toggle-terminal' returns to your
 code."
     (require 'ghostel)
-    ;; Remember the code buffer we're jumping from, so the toggle returns here.
-    (unless (derived-mode-p 'ghostel-mode)
-      (setq my-ghostel--return-buffer (current-buffer)))
     (let* ((project (my-project-root))
            (name (projectile-project-name project))
            (session (my-byobu--session project))
@@ -791,11 +836,13 @@ code."
            (buffer (ghostel)))
       (when fresh
         (with-current-buffer buffer (ghostel-send-string "bb\n")))
-      (if (integerp window)
-          (call-process "tmux" nil nil nil "select-window"
-                        "-t" (format "=%s:%d" session window))
-        (my-projectile--byobu-ensure-window
-         session window project (cdr (assoc window my-project-tab-commands))))
+      (cond ((integerp window)                ; index -> that window
+             (call-process "tmux" nil nil nil "select-window"
+                           "-t" (format "=%s:%d" session window)))
+            (window                            ; name -> ensure/select that tab
+             (my-projectile--byobu-ensure-window
+              session window project (cdr (assoc window my-project-tab-commands)))))
+      ;; WINDOW nil -> leave the session's active tab as-is (the toggle wants this)
       buffer))
 
   (defun my-project-tab-test   (&optional arg) "Select the byobu `test' tab."   (interactive "P") (my-project-tab "test"   arg))
@@ -901,6 +948,53 @@ can be selected.  (Bound to `C-t C-k'; copy mode is `C-c C-t', no clash.)"
         (call-process "tmux" nil nil nil "kill-window"
                       "-t" (format "=%s:%d" (my-byobu--session project) idx)))))
 
+  (defun my-send-region-to-claude (start end)
+    "Cite the region to the project's byobu `claude' tab, wrapped in a code fence.
+Bracketed-pasted, so it lands as one block in Claude's input without submitting,
+then focus moves to the claude tab so you can add a question.  If the current
+buffer isn't under a project, ask which running project session to send to.
+Bound to `C-t C-y'."
+    (interactive "r")
+    (unless (use-region-p) (user-error "Select a region first"))
+    (let* ((text (let ((sel (buffer-substring-no-properties start end)))
+                   (if (string-match-p "\n" sel)
+                       (concat "```\n" sel "\n```\n") ; multi-line -> fenced block
+                     (concat "`" sel "`"))))          ; single line -> inline code
+           (root (ignore-errors (projectile-project-root default-directory)))
+           (session
+            (or (and root (my-byobu--session root))
+                (let ((ss (seq-filter
+                           (lambda (s) (string-prefix-p "projectile/" s))
+                           (split-string
+                            (with-output-to-string
+                              (call-process "tmux" nil standard-output nil
+                                            "list-sessions" "-F" "#{session_name}"))
+                            "\n" t))))
+                  (unless ss (user-error "No project byobu sessions running"))
+                  (completing-read "Cite to session: " ss nil t))))
+           (target (concat "=" session ":claude")))
+      (unless (zerop (call-process "tmux" nil nil nil "select-window" "-t" target))
+        (user-error "No `claude' tab in %s (open it with C-t C-c)" session))
+      ;; sticky association: an unprojected buffer now belongs to this session,
+      ;; so `C-t C-t' from here returns to its terminal.
+      (unless root (setq my-ghostel--cited-session session))
+      (with-temp-buffer
+        (insert text)
+        (call-process-region (point-min) (point-max) "tmux" nil nil nil
+                             "load-buffer" "-b" "emacs-cite" "-"))
+      (call-process "tmux" nil nil nil
+                    "paste-buffer" "-d" "-p" "-b" "emacs-cite" "-t" target)
+      (deactivate-mark)
+      ;; Move focus to the window already showing this session's terminal — do
+      ;; NOT swap the current window's buffer (that re-renders ghostel and hides
+      ;; the fresh paste until you type).  Only open it if nothing shows it.
+      (let* ((gbuf (my-byobu--ghostel-buffer session))
+             (win (and gbuf (get-buffer-window gbuf))))
+        (cond (win  (select-window win))            ; byobu visible -> refocus it, no swap
+              (root (my-project-tab "claude"))       ; not visible -> open project byobu claude
+              (gbuf (pop-to-buffer gbuf))))          ; ask-path, hidden buffer -> reveal
+      (message "Cited %d chars to %s:claude" (- end start) session)))
+
   (defun my-projectile--byobu-window (session)
     "Return the active tmux window name in SESSION (\"\" if not running)."
     (string-trim
@@ -945,10 +1039,17 @@ remembering this buffer to come back to."
                  (not (eq my-ghostel--return-buffer (current-buffer))))
             (switch-to-buffer my-ghostel--return-buffer)
           (switch-to-prev-buffer (selected-window) 1))
-      (setq my-ghostel--return-buffer (current-buffer))
-      (let* ((project (my-project-root))
-             (buf (get-buffer (projectile-generate-process-name "ghostel" nil project))))
-        (if buf (switch-to-buffer buf) (my-project-tab "shell")))))
+      (let* ((root (ignore-errors
+                     (let ((projectile-project-root-cache (make-hash-table :test 'equal)))
+                       (projectile-project-root default-directory))))
+             ;; unprojected buffer that cited somewhere -> its sticky terminal
+             (cited (and (not root) my-ghostel--cited-session
+                         (my-byobu--ghostel-buffer my-ghostel--cited-session))))
+        (cond (cited (switch-to-buffer cited))
+              (root  (let ((buf (get-buffer (projectile-generate-process-name
+                                             "ghostel" nil root))))
+                       (if buf (switch-to-buffer buf) (my-project-tab nil))))
+              (t     (my-project-tab nil))))))               ; prompt (open projects first)
 
   ;; C-t is a real PREFIX keymap (not a command — a command can't host a chord).
   ;; C-t C-t toggles code<->this project's terminal; C-t C-c/C-g/C-s pick a tab.
@@ -962,6 +1063,7 @@ remembering this buffer to come back to."
       (define-key map (kbd "C-s") #'my-project-tab-shell)
       (define-key map (kbd "C-n") #'my-byobu-new-window)    ; new window (ask name)
       (define-key map (kbd "C-k") #'my-byobu-close-window)  ; close (default: current)
+      (define-key map (kbd "C-y") #'my-send-region-to-claude) ; cite region to claude
       ;; Any other key (a plain letter) -> type-to-filter window switch, seeded
       ;; with that key: C-t t -> test, C-t <type a name> -> that window.  So the
       ;; mnemonic chords are kept AND every window (incl. test/custom) is one
