@@ -255,6 +255,9 @@ mouse-3: Next buffer" mouse-face mode-line-highlight local-map
   :custom
   (blink-cursor-mode nil)
   (delete-selection-mode t)
+  (column-number-mode t)
+  ;; Show position as `line:column' (e.g. 12:5) instead of the default `(12,5)'.
+  (mode-line-position-column-line-format '(" %l:%c"))
   (truncate-lines t)
   ;; Preserve an external clipboard value into the kill-ring before a kill
   ;; overwrites it (clipboard hygiene; pairs with the `select' block).
@@ -325,6 +328,11 @@ mouse-3: Next buffer" mouse-face mode-line-highlight local-map
   :ensure nil
   :custom
   (tool-bar-mode nil))
+
+(use-package menu-bar
+  :ensure nil
+  :custom
+  (menu-bar-mode nil))
 
 (use-package tramp
   :ensure nil
