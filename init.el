@@ -108,10 +108,17 @@
                (concat auto-save-list-file-prefix "tramp-\\2") t)
          (list ".*" auto-save-list-file-prefix t)))
   (indent-tabs-mode nil)
+  (tab-width 4)                 ; a literal TAB is 4 columns everywhere
   (native-comp-async-report-warnings-errors 'silent)
   ;; (split-window-preferred-function nil) ; Disable automatic window splitting
   ;; (delete-window-preferred-function nil) ; Disable automatic window deletion
   :config
+  ;; Uniform 4-space indent step.  The code modes (js, css, sh, python, c, ts,
+  ;; lisp) already default to 4; these default to 2, so bump them.  Leave
+  ;; whitespace-sensitive formats like YAML at their own convention.
+  (setq-default sgml-basic-offset 4      ; html / sgml / mhtml
+                nxml-child-indent 4      ; xml
+                nxml-attribute-indent 4)
   ;; deeper-blue is enabled via `custom-enabled-themes' during init, and a theme
   ;; clobbers face overrides applied before it (so `:custom-face' here lost).
   ;; Re-apply our mode-line tweaks after startup and on any theme (re-)enable.
@@ -746,9 +753,14 @@ Detect FRESH every time — `projectile-project-root' memoizes failures in
 `projectile-project-root-cache', so a directory checked before its `git
 init' stays cached as \"no project\".  We bind a throwaway cache so a
 just-created marker is always seen.  When still no project is found, ask
-for a folder to use as the root instead of projectile's project picker."
+for a folder to use as the root instead of projectile's project picker.
+Inside a project terminal, return that terminal's own project (stamped on the
+buffer when it opened), so the C-t commands never re-prompt from there -- which
+matters when the folder isn't a git/projectile project yet (e.g. before `git
+init')."
     (require 'projectile)
-    (or (let ((projectile-project-root-cache (make-hash-table :test 'equal)))
+    (or (and (derived-mode-p 'ghostel-mode) (bound-and-true-p my-ghostel--project))
+        (let ((projectile-project-root-cache (make-hash-table :test 'equal)))
           (projectile-project-root default-directory))
         (my-project--pick-root)))
 
@@ -779,27 +791,33 @@ then other known projects, then a browse-for-folder escape.  Order preserved."
     "Startup command per byobu tab when the window has to be created.
 Tabs not listed here open as a plain shell.")
 
-  (defvar my-ghostel--return-buffer nil
-    "Code buffer the byobu toggle returns to.  Tracked automatically by
-`my-ghostel--remember-buffer'; don't set it from individual switch commands.")
+  (defvar-local my-ghostel--return-buffer nil
+    "The code buffer THIS terminal was entered from; `C-t C-t' returns here.
+Buffer-local on the terminal, so two projects' terminals each go back to their
+own editor buffer instead of sharing one global \"last buffer\".  Stamped at
+entry by `my-ghostel--enter-from' / `my-project-tab'; navigating between tabs
+from inside a terminal leaves it alone.")
 
-  (defun my-ghostel--remember-buffer (&rest _)
-    "Record the selected window's buffer as the byobu return target, unless it's
-a terminal or the minibuffer.  Hung on the window-change hooks so EVERY route to
-the terminal (toggle, the `C-t' tab keys, citation, plain window moves) returns
-to wherever you actually were — no per-call-site bookkeeping."
-    (let ((buf (window-buffer (selected-window))))
-      (unless (or (minibufferp buf)
-                  (provided-mode-derived-p (buffer-local-value 'major-mode buf)
-                                           'ghostel-mode))
-        (setq my-ghostel--return-buffer buf))))
-  (add-hook 'window-selection-change-functions #'my-ghostel--remember-buffer)
-  (add-hook 'window-buffer-change-functions    #'my-ghostel--remember-buffer)
+  (defun my-ghostel--enter-from (term-buffer src)
+    "Switch to TERM-BUFFER, recording SRC as its `my-ghostel--return-buffer'.
+Skips the recording when SRC is itself a terminal, so moving between tabs doesn't
+overwrite where you came in from."
+    (when (and (buffer-live-p src)
+               (not (provided-mode-derived-p (buffer-local-value 'major-mode src)
+                                             'ghostel-mode)))
+      (with-current-buffer term-buffer (setq-local my-ghostel--return-buffer src)))
+    (switch-to-buffer term-buffer))
 
   (defvar-local my-ghostel--cited-session nil
     "Sticky byobu-session association for an unprojected buffer.  Set when you
 cite from here with `C-t C-y'; `C-t C-t' then jumps to that session's terminal
 instead of asking for a folder.  Lives for the buffer's lifetime.")
+
+  (defvar-local my-ghostel--project nil
+    "Project root this ghostel terminal was opened for.  Stamped by
+`my-project-tab' so `my-project-root' (and thus every `C-t' command) resolves to
+it from inside the terminal instead of re-detecting -- crucial when the folder
+isn't a git/projectile project yet.")
 
   (defun my-byobu--session (project)
     "tmux session name for PROJECT, sanitized like `bb' (./: -> _)."
@@ -825,7 +843,8 @@ shell), an integer selects that window index — unambiguous when names clash.
 All tabs share one ghostel buffer; `my-ghostel-toggle-terminal' returns to your
 code."
     (require 'ghostel)
-    (let* ((project (my-project-root))
+    (let* ((src (current-buffer))
+           (project (my-project-root))
            (name (projectile-project-name project))
            (session (my-byobu--session project))
            (ghostel-buffer-name (projectile-generate-process-name "ghostel" arg project))
@@ -834,6 +853,13 @@ code."
            (process-environment
             (cons (concat "PROJECTILE_PROJECT_NAME=" name) process-environment))
            (buffer (ghostel)))
+      ;; Stamp the project on the terminal buffer so `my-project-root' resolves
+      ;; to it from inside (no re-prompt even when the folder isn't a project).
+      (with-current-buffer buffer (setq-local my-ghostel--project project))
+      ;; Record where we entered from, per terminal -- but not when coming from
+      ;; another terminal (tab navigation must not move the return target).
+      (unless (provided-mode-derived-p (buffer-local-value 'major-mode src) 'ghostel-mode)
+        (with-current-buffer buffer (setq-local my-ghostel--return-buffer src)))
       (when fresh
         (with-current-buffer buffer (ghostel-send-string "bb\n")))
       (cond ((integerp window)                ; index -> that window
@@ -988,8 +1014,14 @@ Bound to `C-t C-y'."
       ;; Move focus to the window already showing this session's terminal — do
       ;; NOT swap the current window's buffer (that re-renders ghostel and hides
       ;; the fresh paste until you type).  Only open it if nothing shows it.
-      (let* ((gbuf (my-byobu--ghostel-buffer session))
+      (let* ((src (current-buffer))
+             (gbuf (my-byobu--ghostel-buffer session))
              (win (and gbuf (get-buffer-window gbuf))))
+        ;; per-terminal return: C-t C-t from this terminal comes back to where we
+        ;; cited from (the `my-project-tab' branch records this itself).
+        (when (and gbuf (not (provided-mode-derived-p
+                              (buffer-local-value 'major-mode src) 'ghostel-mode)))
+          (with-current-buffer gbuf (setq-local my-ghostel--return-buffer src)))
         (cond (win  (select-window win))            ; byobu visible -> refocus it, no swap
               (root (my-project-tab "claude"))       ; not visible -> open project byobu claude
               (gbuf (pop-to-buffer gbuf))))          ; ask-path, hidden buffer -> reveal
@@ -1039,16 +1071,17 @@ remembering this buffer to come back to."
                  (not (eq my-ghostel--return-buffer (current-buffer))))
             (switch-to-buffer my-ghostel--return-buffer)
           (switch-to-prev-buffer (selected-window) 1))
-      (let* ((root (ignore-errors
+      (let* ((src (current-buffer))
+             (root (ignore-errors
                      (let ((projectile-project-root-cache (make-hash-table :test 'equal)))
                        (projectile-project-root default-directory))))
              ;; unprojected buffer that cited somewhere -> its sticky terminal
              (cited (and (not root) my-ghostel--cited-session
                          (my-byobu--ghostel-buffer my-ghostel--cited-session))))
-        (cond (cited (switch-to-buffer cited))
+        (cond (cited (my-ghostel--enter-from cited src))
               (root  (let ((buf (get-buffer (projectile-generate-process-name
                                              "ghostel" nil root))))
-                       (if buf (switch-to-buffer buf) (my-project-tab nil))))
+                       (if buf (my-ghostel--enter-from buf src) (my-project-tab nil))))
               (t     (my-project-tab nil))))))               ; prompt (open projects first)
 
   ;; C-t is a real PREFIX keymap (not a command — a command can't host a chord).
@@ -1461,7 +1494,23 @@ remembering this buffer to come back to."
           sly-mrepl-mode)
          . paren-face-mode))
 
-(use-package markdown-mode)
+(use-package markdown-mode
+  :custom
+  ;; GitHub-flavored rendering for the live preview, via node's `marked' (gfm).
+  (markdown-command "marked"))
+
+(use-package markdown-preview-mode
+  ;; GitHub-flavored live preview: `C-c C-c g' toggles a browser preview that
+  ;; updates as you type.  The markdown is rendered locally (`markdown-command'
+  ;; = marked) and pushed over a localhost websocket, so the draft is NEVER
+  ;; uploaded -- unlike grip, which POSTs it to GitHub.  The preview page itself
+  ;; still pulls jquery + the github-markdown CSS from public CDNs (styling only,
+  ;; no document content leaves the machine).
+  :after markdown-mode
+  :bind (:map markdown-mode-command-map ("g" . markdown-preview-mode))
+  :custom
+  (markdown-preview-stylesheets
+   (list "https://cdn.jsdelivr.net/npm/github-markdown-css@5/github-markdown.css")))
 
 (use-package magit
   :commands (magit-status magit-dispatch)
