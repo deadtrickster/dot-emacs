@@ -111,19 +111,25 @@
   (native-comp-async-report-warnings-errors 'silent)
   ;; (split-window-preferred-function nil) ; Disable automatic window splitting
   ;; (delete-window-preferred-function nil) ; Disable automatic window deletion
-  :custom-face
-  ;; deeper-blue's mode-line is gray75 — a bright bar that pulls the eye off the
-  ;; buffer text.  Calm it to a dark slate (the byobu active-tab style below uses
-  ;; the same colour), with inactive windows dimmer still.
-  (mode-line ((t (:background "#2a2f3d" :foreground "#a9b1c2"))))
-  (mode-line-active ((t (:background "#2a2f3d" :foreground "#a9b1c2"))))
-  (mode-line-inactive ((t (:background "#1e212b" :foreground "#5e6573"))))
-  ;; deeper-blue colours the buffer name `blue4' (invisible on the slate), and
-  ;; envrc's "none" indicator inherits the bright `warning' yellow — calm both.
-  ;; The buffer name uses the same foreground as the byobu active window name.
-  (mode-line-buffer-id ((t (:foreground "#e3e7ee" :weight bold))))
-  (envrc-mode-line-none-face ((t (:foreground "#75808f" :weight normal))))
   :config
+  ;; deeper-blue is enabled via `custom-enabled-themes' during init, and a theme
+  ;; clobbers face overrides applied before it (so `:custom-face' here lost).
+  ;; Re-apply our mode-line tweaks after startup and on any theme (re-)enable.
+  (defun my-tune-mode-line-faces (&rest _)
+    "Calm the mode-line over deeper-blue: dark slate bar, white buffer name,
+dimmed envrc `none' (inactive windows dimmer than active)."
+    (set-face-attribute 'mode-line nil :background "#2a2f3d" :foreground "#a9b1c2")
+    (when (facep 'mode-line-active)
+      (set-face-attribute 'mode-line-active nil :background "#2a2f3d" :foreground "#a9b1c2"))
+    (set-face-attribute 'mode-line-inactive nil :background "#1e212b" :foreground "#5e6573")
+    ;; buffer name: same foreground as the byobu active window name (was blue4)
+    (set-face-attribute 'mode-line-buffer-id nil :foreground "#e3e7ee" :weight 'bold)
+    ;; envrc "none": drop the bright `warning' yellow inheritance
+    (when (facep 'envrc-mode-line-none-face)
+      (set-face-attribute 'envrc-mode-line-none-face nil :inherit nil
+                          :foreground "#75808f" :weight 'normal)))
+  (add-hook 'emacs-startup-hook #'my-tune-mode-line-faces)
+  (add-hook 'enable-theme-functions #'my-tune-mode-line-faces)
   ;; C-t is a prefix map (set up in the `projectile' block): C-t C-t = byobu
   ;; terminal, C-t C-c = claude.  Each toggles, so the same chord returns you.
   (global-set-key (kbd "<home>") 'beginning-of-line)
@@ -757,23 +763,26 @@ Tabs not listed here open as a plain shell.")
   (defvar my-ghostel--return-buffer nil
     "Code buffer to return to from a project byobu terminal (set on jump-in).")
 
+  (defun my-byobu--session (project)
+    "tmux session name for PROJECT, sanitized like `bb' (./: -> _)."
+    (concat "projectile/"
+            (replace-regexp-in-string "[.: ]" "_" (projectile-project-name project))))
+
   (defun my-project-tab (window &optional arg)
-    "Open the project's byobu session and select its WINDOW tab.
-Starts the session with `bb' if it isn't running yet (default tabs:
-claude/shell/git/test, native PTY spawn so `ghostel-send-string' feeds
-the shell), then selects WINDOW — creating it on demand (running the
-command from `my-project-tab-commands', else a plain shell) for sessions
-whose saved layout predates it.  All tabs share one ghostel buffer; a
-a project-aware toggle (`my-ghostel-toggle-terminal') returns you to your code."
+    "Open the project's byobu session and select WINDOW.
+WINDOW is a tab name (string) or a tmux window index (integer).  Starts the
+session with `bb' if needed (default tabs claude/shell/git/test); a string
+names a tab (created on demand from `my-project-tab-commands', else a plain
+shell), an integer selects that window index — unambiguous when names clash.
+All tabs share one ghostel buffer; `my-ghostel-toggle-terminal' returns to your
+code."
     (require 'ghostel)
     ;; Remember the code buffer we're jumping from, so the toggle returns here.
     (unless (derived-mode-p 'ghostel-mode)
       (setq my-ghostel--return-buffer (current-buffer)))
     (let* ((project (my-project-root))
            (name (projectile-project-name project))
-           ;; tmux rewrites '.'/':' in session names to '_'; match that (and `bb')
-           ;; so our `=session:window' targets resolve (e.g. project `.emacs.d').
-           (session (concat "projectile/" (replace-regexp-in-string "[.: ]" "_" name)))
+           (session (my-byobu--session project))
            (ghostel-buffer-name (projectile-generate-process-name "ghostel" arg project))
            (fresh (not (get-buffer ghostel-buffer-name)))
            (default-directory project)
@@ -782,8 +791,11 @@ a project-aware toggle (`my-ghostel-toggle-terminal') returns you to your code."
            (buffer (ghostel)))
       (when fresh
         (with-current-buffer buffer (ghostel-send-string "bb\n")))
-      (my-projectile--byobu-ensure-window
-       session window project (cdr (assoc window my-project-tab-commands)))
+      (if (integerp window)
+          (call-process "tmux" nil nil nil "select-window"
+                        "-t" (format "=%s:%d" session window))
+        (my-projectile--byobu-ensure-window
+         session window project (cdr (assoc window my-project-tab-commands))))
       buffer))
 
   (defun my-project-tab-test   (&optional arg) "Select the byobu `test' tab."   (interactive "P") (my-project-tab "test"   arg))
@@ -791,60 +803,58 @@ a project-aware toggle (`my-ghostel-toggle-terminal') returns you to your code."
   (defun my-project-tab-git    (&optional arg) "Select the byobu `git' tab."    (interactive "P") (my-project-tab "git"    arg))
   (defun my-project-tab-shell  (&optional arg) "Select the byobu `shell' tab."  (interactive "P") (my-project-tab "shell"  arg))
 
-  (defun my-byobu--window-names (project)
-    "Window names of PROJECT's byobu session (from tmux), else the defaults."
-    (let* ((name (projectile-project-name project))
-           (session (concat "projectile/"
-                            (replace-regexp-in-string "[.: ]" "_" name)))
-           (names (split-string
-                   (with-output-to-string
-                     (call-process "tmux" nil standard-output nil
-                                   "list-windows" "-t" (concat "=" session)
-                                   "-F" "#{window_name}"))
-                   "\n" t)))
-      (or names '("claude" "shell" "git" "test"))))
-
-  (defun my-byobu-switch-window ()
-    "Jump to a byobu window of the current project by name.
-Bound to `C-t <key>' for any key that isn't one of the C- chords.  If exactly
-one window name starts with that key, jump there immediately (`C-t g' -> git);
-otherwise open a type-to-filter list seeded with the key (prefix-first, so
-`C-t t' surfaces `test').  Choosing a name that doesn't exist creates it."
-    (interactive)
-    (let* ((seed (let ((e last-command-event))
-                   (and (characterp e) (<= ?! e ?~) (char-to-string e))))
-           (project (my-project-root))
-           (windows (my-byobu--window-names project))
-           (hits (and seed (seq-filter (lambda (w) (string-prefix-p seed w t)) windows))))
-      (if (and hits (null (cdr hits)))
-          ;; exactly one window starts with the seed -> go straight there
-          (my-project-tab (car hits))
-        ;; ambiguous / no prefix match -> type-to-filter, seeded.  Prefix-first
-        ;; (substring fallback) so the seed acts like the window's initial.
-        (let* ((completion-styles '(basic substring))
-               (choice (completing-read "byobu window: " windows nil nil seed)))
-          (when (and (stringp choice) (not (string-empty-p choice)))
-            (my-project-tab choice))))))
-
-  (defun my-byobu--session (project)
-    "tmux session name for PROJECT, sanitized like `bb' (./: -> _)."
-    (concat "projectile/"
-            (replace-regexp-in-string "[.: ]" "_" (projectile-project-name project))))
-
-  (defun my-byobu--current-window (project)
-    "Name of the active window in PROJECT's byobu session, or nil.
-Reads `list-windows' and picks the one flagged active — `display-message'
-returns nothing for a session with no attached client."
+  (defun my-byobu--windows (project)
+    "List of (INDEX NAME ACTIVE) for PROJECT's byobu windows, in tmux order.
+Falls back to the default tab names if the session isn't running yet."
     (let ((lines (split-string
                   (with-output-to-string
                     (call-process "tmux" nil standard-output nil "list-windows"
                                   "-t" (concat "=" (my-byobu--session project))
-                                  "-F" "#{window_active} #{window_name}"))
+                                  "-F" "#{window_index} #{window_active} #{window_name}"))
                   "\n" t)))
-      (catch 'found
-        (dolist (l lines)
-          (when (string-prefix-p "1 " l)
-            (throw 'found (substring l 2)))))))
+      (if lines
+          (mapcar (lambda (l)
+                    (let ((p (split-string l " ")))
+                      (list (string-to-number (nth 0 p))
+                            (string-join (nthcdr 2 p) " ")
+                            (equal (nth 1 p) "1"))))
+                  lines)
+        (seq-map-indexed (lambda (n i) (list i n nil))
+                         '("claude" "shell" "git" "test")))))
+
+  (defun my-byobu--labeled (windows)
+    "Alist (LABEL . INDEX) for WINDOWS (each (INDEX NAME ACTIVE)).
+Clashing names are disambiguated Emacs-style with the tmux index —
+\"shell<2>\", \"shell<4>\" — so every window is uniquely selectable even when
+tmux folds same-named tabs to one `:name' target."
+    (let ((dups (make-hash-table :test 'equal)))
+      (dolist (w windows) (puthash (nth 1 w) (1+ (gethash (nth 1 w) dups 0)) dups))
+      (mapcar (lambda (w)
+                (let ((nm (nth 1 w)) (idx (nth 0 w)))
+                  (cons (if (> (gethash nm dups) 1) (format "%s<%d>" nm idx) nm) idx)))
+              windows)))
+
+  (defun my-byobu-switch-window ()
+    "Switch to a byobu window of the current project.
+Bound to `C-t <key>' for any key that isn't one of the C- chords:
+a digit jumps to that window index (`C-t 3'), unambiguous when names clash;
+a letter that uniquely prefixes one window jumps straight there (`C-t g');
+otherwise a type-to-filter list seeded by the key, clashing names shown as
+`shell<2>'/`shell<4>'.  A name not in the list is created."
+    (interactive)
+    (let ((seed (let ((e last-command-event))
+                  (and (characterp e) (<= ?! e ?~) (char-to-string e)))))
+      (if (and seed (string-match-p "\\`[0-9]\\'" seed))
+          (my-project-tab (string-to-number seed))
+        (let* ((labeled (my-byobu--labeled (my-byobu--windows (my-project-root))))
+               (labels (mapcar #'car labeled))
+               (hits (and seed (seq-filter (lambda (l) (string-prefix-p seed l t)) labels))))
+          (if (and hits (null (cdr hits)))
+              (my-project-tab (cdr (assoc (car hits) labeled)))
+            (let* ((completion-styles '(basic substring))
+                   (choice (completing-read "byobu window: " labels nil nil seed)))
+              (when (and (stringp choice) (not (string-empty-p choice)))
+                (my-project-tab (or (cdr (assoc choice labeled)) choice)))))))))
 
   (defun my-byobu-new-window (name)
     "Create byobu window NAME in the current project's session and switch to it."
@@ -853,16 +863,23 @@ returns nothing for a session with no attached client."
     (unless (string-empty-p name)
       (my-project-tab name)))
 
-  (defun my-byobu-close-window (name)
-    "Kill byobu window NAME in the current project's session (default: current)."
-    (interactive
-     (let ((project (my-project-root)))
-       (list (completing-read "Close byobu window: " (my-byobu--window-names project)
-                              nil t nil nil (my-byobu--current-window project)))))
-    (when (and (stringp name) (not (string-empty-p name))
-               (y-or-n-p (format "Kill byobu window %s? " name)))
-      (call-process "tmux" nil nil nil "kill-window"
-                    "-t" (concat "=" (my-byobu--session (my-project-root)) ":" name))))
+  (defun my-byobu-close-window ()
+    "Kill a byobu window of the current project, targeted by index.
+Defaults to the current window; clashing names are disambiguated by index, so
+every window — including duplicate `shell' tabs that are unkillable by name —
+can be selected.  (Bound to `C-t C-k'; copy mode is `C-c C-t', no clash.)"
+    (interactive)
+    (let* ((project (my-project-root))
+           (windows (my-byobu--windows project))
+           (labeled (my-byobu--labeled windows))
+           (current (let ((a (seq-find (lambda (w) (nth 2 w)) windows)))
+                      (and a (car (rassoc (nth 0 a) labeled)))))
+           (choice (completing-read "Close byobu window: " (mapcar #'car labeled)
+                                    nil t nil nil current))
+           (idx (cdr (assoc choice labeled))))
+      (when (and idx (y-or-n-p (format "Kill byobu window %s? " choice)))
+        (call-process "tmux" nil nil nil "kill-window"
+                      "-t" (format "=%s:%d" (my-byobu--session project) idx)))))
 
   (defun my-projectile--byobu-window (session)
     "Return the active tmux window name in SESSION (\"\" if not running)."
