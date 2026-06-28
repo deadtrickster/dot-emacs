@@ -834,6 +834,27 @@ tmux folds same-named tabs to one `:name' target."
                   (cons (if (> (gethash nm dups) 1) (format "%s<%d>" nm idx) nm) idx)))
               windows)))
 
+  (defun my-byobu--prefix-sort (cands)
+    "Sort CANDS so windows whose name prefixes the current minibuffer input come
+first; non-prefix (substring) matches still appear, just ranked lower."
+    (let ((input (ignore-errors (minibuffer-contents-no-properties))))
+      (if (or (null input) (string-empty-p input))
+          cands
+        (sort (copy-sequence cands)
+              (lambda (a b) (and (string-prefix-p input a t)
+                                 (not (string-prefix-p input b t))))))))
+
+  (defun my-byobu--complete (prompt labels require-match initial default)
+    "Read a window LABEL, prefix matches ranked first (not exclusive — substring
+matches still show, just lower).  See `my-byobu--prefix-sort'."
+    (completing-read
+     prompt
+     (lambda (str pred action)
+       (if (eq action 'metadata)
+           (list 'metadata (cons 'display-sort-function #'my-byobu--prefix-sort))
+         (complete-with-action action labels str pred)))
+     nil require-match initial nil default))
+
   (defun my-byobu-switch-window ()
     "Switch to a byobu window of the current project.
 Bound to `C-t <key>' for any key that isn't one of the C- chords:
@@ -851,8 +872,7 @@ otherwise a type-to-filter list seeded by the key, clashing names shown as
                (hits (and seed (seq-filter (lambda (l) (string-prefix-p seed l t)) labels))))
           (if (and hits (null (cdr hits)))
               (my-project-tab (cdr (assoc (car hits) labeled)))
-            (let* ((completion-styles '(basic substring))
-                   (choice (completing-read "byobu window: " labels nil nil seed)))
+            (let ((choice (my-byobu--complete "byobu window: " labels nil seed nil)))
               (when (and (stringp choice) (not (string-empty-p choice)))
                 (my-project-tab (or (cdr (assoc choice labeled)) choice)))))))))
 
@@ -874,8 +894,8 @@ can be selected.  (Bound to `C-t C-k'; copy mode is `C-c C-t', no clash.)"
            (labeled (my-byobu--labeled windows))
            (current (let ((a (seq-find (lambda (w) (nth 2 w)) windows)))
                       (and a (car (rassoc (nth 0 a) labeled)))))
-           (choice (completing-read "Close byobu window: " (mapcar #'car labeled)
-                                    nil t nil nil current))
+           (choice (my-byobu--complete "Close byobu window: " (mapcar #'car labeled)
+                                       t nil current))
            (idx (cdr (assoc choice labeled))))
       (when (and idx (y-or-n-p (format "Kill byobu window %s? " choice)))
         (call-process "tmux" nil nil nil "kill-window"
