@@ -515,6 +515,99 @@ mouse-3: Next buffer" mouse-face mode-line-highlight local-map
   (unless (server-running-p)
     (server-start)))
 
+;; `M-x my-restart-everything': kill the project byobu sessions, restart Emacs,
+;; then bring back the open file buffers, the window layout, AND the project
+;; terminals.  We stash an explicit snapshot (file list + `window-state' +
+;; terminal project roots) rather than lean on `desktop' (whose hook-driven
+;; restore is unreliable).  Since `window-state' references buffers by name, the
+;; re-created ghostel terminals (deterministic names) land back in their panes.
+(use-package emacs
+  :init
+  (defvar my-restart--state-file
+    (expand-file-name ".restart-state.el" user-emacs-directory)
+    "Where `my-restart-everything' stashes the session snapshot across a restart.")
+
+  (defun my-restart--terminal-dirs ()
+    "Project root of every live ghostel terminal buffer — one entry per project.
+Dedups by the projectile root (not raw `default-directory'), so terminals from
+different projects all come back and a terminal whose cwd drifted into a subdir
+(OSC 7 tracking) still maps to the right project session."
+    (delete-dups
+     (delq nil (mapcar (lambda (b)
+                         (with-current-buffer b
+                           (when (derived-mode-p 'ghostel-mode)
+                             (or (ignore-errors
+                                   (projectile-project-root default-directory))
+                                 default-directory))))
+                       (buffer-list)))))
+
+  (defun my-restart--kill-byobu ()
+    "Kill the per-project byobu/tmux sessions (projectile/*)."
+    (when (executable-find "tmux")
+      (dolist (s (split-string
+                  (with-output-to-string
+                    (call-process "tmux" nil standard-output nil
+                                  "list-sessions" "-F" "#{session_name}"))
+                  "\n" t))
+        (when (string-prefix-p "projectile/" s)
+          (call-process "tmux" nil nil nil "kill-session" "-t" (concat "=" s))))))
+
+  (defun my-restart-everything ()
+    "Kill the project byobu sessions, restart Emacs, then restore the open file
+buffers, window layout, and project terminals."
+    (interactive)
+    (when (yes-or-no-p "Kill byobu sessions and restart Emacs (restoring after)? ")
+      (save-some-buffers)
+      (with-temp-file my-restart--state-file
+        (prin1 (list :files (delq nil (mapcar #'buffer-file-name (buffer-list)))
+                     :frame (let ((f (selected-frame)))
+                              (list (cons 'fullscreen (frame-parameter f 'fullscreen))
+                                    (cons 'width  (frame-parameter f 'width))
+                                    (cons 'height (frame-parameter f 'height))
+                                    (cons 'left   (frame-parameter f 'left))
+                                    (cons 'top    (frame-parameter f 'top))))
+                     :windows (window-state-get (frame-root-window) t)
+                     :terminals (my-restart--terminal-dirs))
+               (current-buffer)))
+      (my-restart--kill-byobu)
+      (restart-emacs)))
+
+  (defun my-restart--maybe-restore ()
+    "If `my-restart-everything' left a snapshot, restore it once."
+    (when (file-exists-p my-restart--state-file)
+      (let ((data (ignore-errors
+                    (with-temp-buffer (insert-file-contents my-restart--state-file)
+                                      (read (current-buffer))))))
+        (delete-file my-restart--state-file)   ; consume even on partial restore
+        (when data
+          ;; 1. reopen the files (so window-state can place them by name)
+          (dolist (f (plist-get data :files))
+            (when (and (stringp f) (file-exists-p f))
+              (ignore-errors (find-file-noselect f))))
+          ;; 2. re-create the project terminals (same buffer names as before)
+          (dolist (dir (plist-get data :terminals))
+            (when (and (stringp dir) (file-directory-p dir))
+              (let ((default-directory dir))
+                (ignore-errors (my-project-tab "shell")))))
+          ;; 3. restore frame geometry (window-state covers only the inner
+          ;;    layout, not the frame's own size/position/maximized state)
+          (ignore-errors
+            (let* ((fp (plist-get data :frame))
+                   (fs (alist-get 'fullscreen fp)))
+              (if fs
+                  (set-frame-parameter (selected-frame) 'fullscreen fs)
+                (modify-frame-parameters
+                 (selected-frame)
+                 (list (cons 'width  (alist-get 'width fp))
+                       (cons 'height (alist-get 'height fp))
+                       (cons 'left   (alist-get 'left fp))
+                       (cons 'top    (alist-get 'top fp)))))))
+          ;; 4. restore the window layout last, now that the buffers exist
+          (ignore-errors
+            (window-state-put (plist-get data :windows) (frame-root-window) t))))))
+  :config
+  (add-hook 'emacs-startup-hook #'my-restart--maybe-restore))
+
 ;; Monorepo self-install: this .emacs.d repo also vendors the shell + byobu
 ;; integration (shell/integration.bash, byobu/*).  Ensure, idempotently at
 ;; startup, that ~/.bashrc sources the snippet and that the vendored byobu files
@@ -678,6 +771,41 @@ a project-aware toggle (`my-ghostel-toggle-terminal') returns you to your code."
   (defun my-project-tab-git    (&optional arg) "Select the byobu `git' tab."    (interactive "P") (my-project-tab "git"    arg))
   (defun my-project-tab-shell  (&optional arg) "Select the byobu `shell' tab."  (interactive "P") (my-project-tab "shell"  arg))
 
+  (defun my-byobu--window-names (project)
+    "Window names of PROJECT's byobu session (from tmux), else the defaults."
+    (let* ((name (projectile-project-name project))
+           (session (concat "projectile/"
+                            (replace-regexp-in-string "[.: ]" "_" name)))
+           (names (split-string
+                   (with-output-to-string
+                     (call-process "tmux" nil standard-output nil
+                                   "list-windows" "-t" (concat "=" session)
+                                   "-F" "#{window_name}"))
+                   "\n" t)))
+      (or names '("claude" "shell" "git" "test"))))
+
+  (defun my-byobu-switch-window ()
+    "Jump to a byobu window of the current project by name.
+Bound to `C-t <key>' for any key that isn't one of the C- chords.  If exactly
+one window name starts with that key, jump there immediately (`C-t g' -> git);
+otherwise open a type-to-filter list seeded with the key (prefix-first, so
+`C-t t' surfaces `test').  Choosing a name that doesn't exist creates it."
+    (interactive)
+    (let* ((seed (let ((e last-command-event))
+                   (and (characterp e) (<= ?! e ?~) (char-to-string e))))
+           (project (my-project-root))
+           (windows (my-byobu--window-names project))
+           (hits (and seed (seq-filter (lambda (w) (string-prefix-p seed w t)) windows))))
+      (if (and hits (null (cdr hits)))
+          ;; exactly one window starts with the seed -> go straight there
+          (my-project-tab (car hits))
+        ;; ambiguous / no prefix match -> type-to-filter, seeded.  Prefix-first
+        ;; (substring fallback) so the seed acts like the window's initial.
+        (let* ((completion-styles '(basic substring))
+               (choice (completing-read "byobu window: " windows nil nil seed)))
+          (when (and (stringp choice) (not (string-empty-p choice)))
+            (my-project-tab choice))))))
+
   (defun my-projectile--byobu-window (session)
     "Return the active tmux window name in SESSION (\"\" if not running)."
     (string-trim
@@ -732,11 +860,16 @@ remembering this buffer to come back to."
   ;; (A C-g *after* the C-t prefix is a normal key, not a quit, so it binds fine.)
   (defvar my-ghostel-prefix-map
     (let ((map (make-sparse-keymap)))
-      (dolist (b '(("C-t" . my-ghostel-toggle-terminal) ("t" . my-ghostel-toggle-terminal)
-                   ("C-c" . my-project-tab-claude)       ("c" . my-project-tab-claude)
-                   ("C-g" . my-project-tab-git)          ("g" . my-project-tab-git)
-                   ("C-s" . my-project-tab-shell)        ("s" . my-project-tab-shell)))
-        (define-key map (kbd (car b)) (cdr b)))
+      ;; C- chords = direct actions (C-t toggles back to your code).
+      (define-key map (kbd "C-t") #'my-ghostel-toggle-terminal)
+      (define-key map (kbd "C-c") #'my-project-tab-claude)
+      (define-key map (kbd "C-g") #'my-project-tab-git)
+      (define-key map (kbd "C-s") #'my-project-tab-shell)
+      ;; Any other key (a plain letter) -> type-to-filter window switch, seeded
+      ;; with that key: C-t t -> test, C-t <type a name> -> that window.  So the
+      ;; mnemonic chords are kept AND every window (incl. test/custom) is one
+      ;; C-t-then-type away — nothing sacrificed.
+      (define-key map [t] #'my-byobu-switch-window)
       map)
     "Prefix map bound to \\`C-t' (in the global map and `ghostel-mode-map').")
   :config
@@ -835,7 +968,8 @@ remembering this buffer to come back to."
   ;; C-t prefix (toggle / tab switch, bound in `ghostel-mode-map') works inside
   ;; the terminal.  Without this, ghostel's semi-char input map forwards C-t to
   ;; the PTY.  (The :set on this defcustom rebuilds the input keymap.)
-  (ghostel-keymap-exceptions '("C-c" "C-x" "C-u" "C-h" "M-x" "M-:" "C-\\" "C-t"))
+  (ghostel-keymap-exceptions '("C-c" "C-x" "C-u" "C-h" "M-x" "M-:" "C-\\" "C-t"
+                               "C-<up>" "C-<down>" "C-<left>" "C-<right>"))
   :custom-face
   ;; The installed ghostel palette inherits `ansi-color-*' (red3, green3, …),
   ;; but the theme customizes `term-color-*'.  Point the palette at the themed
@@ -1114,7 +1248,12 @@ remembering this buffer to come back to."
 (use-package paredit
   :hook ((emacs-lisp-mode lisp-mode lisp-data-mode lisp-interaction-mode
           sly-mrepl-mode)
-         . enable-paredit-mode))
+         . enable-paredit-mode)
+  :config
+  ;; Don't let paredit's slurp/barf shadow windmove on the C-arrows; they stay
+  ;; available on C-) / C-} (and M-( ).
+  (define-key paredit-mode-map (kbd "C-<right>") nil)
+  (define-key paredit-mode-map (kbd "C-<left>") nil))
 
 ;; Dim parens to a low-contrast gray (the `parenthesis' face) so the symbols
 ;; read cleanly, instead of coloring each nesting level.  All Lisps + SLY REPL.
