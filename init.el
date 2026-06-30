@@ -1620,32 +1620,18 @@ when you next select a terminal buffer."
   (require 'git-commit)
   (require 'git-rebase)
 
-  ;; Commits are prepared as a magit commit buffer to REVIEW, never `git commit
-  ;; -m' blind.  The `ecommit' script sets `my-magit--prefill' and calls
-  ;; `my-magit-commit', which opens the commit buffer pre-filled with the message
-  ;; for the STAGED changes -- finish with C-c C-c, abort with C-c C-k.
-  (defvar my-magit--prefill nil
-    "Message to pre-fill the next magit commit buffer with (consumed once).")
-  (defun my-magit--prefill-insert ()
-    (when my-magit--prefill
-      (save-excursion (goto-char (point-min)) (insert my-magit--prefill))
-      (setq my-magit--prefill nil)))
-  (add-hook 'git-commit-setup-hook #'my-magit--prefill-insert)
-  (defun my-magit-commit (msg &optional dir)
-    "Open a magit commit buffer for DIR's staged changes, pre-filled with MSG,
-for the user to review and finish (C-c C-c) / abort (C-c C-k)."
+  ;; Commits are prepared as a commit buffer to REVIEW, never `git commit -m'
+  ;; blind.  `my-magit-commit' runs `magit-commit-create' with "-e -F FILE", so
+  ;; git itself seeds the (editable) message from FILE -- robust, no fragile
+  ;; prefill hook, no timeout poll.  with-editor runs git as an Emacs-owned async
+  ;; process (survives the calling shell); finish C-c C-c / abort C-c C-k.  The
+  ;; `ecommit' script calls this over emacsclient with a message-file path.
+  (defun my-magit-commit (msgfile &optional dir)
+    "Open an editable commit buffer for DIR's staged changes, seeded by git from
+MSGFILE (via `git commit -e -F').  Called by the `ecommit' script."
     (require 'magit)
     (let ((default-directory (or dir default-directory)))
-      (setq my-magit--prefill msg)
-      (magit-commit-create)
-      ;; with-editor spawns git asynchronously; the commit buffer appears only
-      ;; when git invokes the editor.  Pump the event loop until it's up, so a
-      ;; caller (the `ecommit' script) returns once it's ready -- no races.
-      (let ((n 0))
-        (while (and (< n 50)
-                    (not (seq-find (lambda (b) (buffer-local-value 'git-commit-mode b))
-                                   (buffer-list))))
-          (sit-for 0.1) (setq n (1+ n))))))
+      (magit-commit-create (list "-e" "-F" (expand-file-name msgfile)))))
 
   ;; Make the staged-file lines in the commit buffer clickable + RET-openable
   ;; (dashboard-style), so you can jump to a changed file from the message.
