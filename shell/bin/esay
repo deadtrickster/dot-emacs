@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Post a message into the user's running Emacs (echo area).  Goes through
+# emacsclient, so unlike the escape-sequence interactive `say' it works from a
+# captured-stdout shell (Claude Code's Bash tool) -- the escape would be eaten by
+# the tool's output capture instead of reaching ghostel.  Vendored; symlinked
+# onto PATH by `my-ensure-shell-integration'.  Allowlist with: Bash(esay:*)
+set -euo pipefail
+msg="$*"
+esc=$(printf '%s' "$msg" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')
+exec emacsclient -e "(message \"%s\" \"$esc\")" >/dev/null

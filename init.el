@@ -666,6 +666,21 @@ buffers, window layout, and project terminals."
                             (shell-quote-argument integ))
                     end "\n")
             (write-region (point-min) (point-max) bashrc)))))
+    ;; 1b. Symlink the vendored Claude/Emacs helper scripts onto PATH so a
+    ;;     non-interactive shell (Claude's Bash tool) can run them, and ensure
+    ;;     they stay executable even if git didn't preserve the mode.
+    (let ((bin-src (expand-file-name "shell/bin" repo))
+          (bin-dst (expand-file-name "~/.local/bin")))
+      (dolist (f '("eopen" "esay" "enotify" "ecommit"))
+        (let ((src (expand-file-name f bin-src))
+              (dst (expand-file-name f bin-dst)))
+          (when (file-exists-p src)
+            (make-directory bin-dst t)
+            (set-file-modes src #o755)
+            (unless (and (file-symlink-p dst)
+                         (string= (file-truename dst) (file-truename src)))
+              (when (file-exists-p dst) (delete-file dst))
+              (make-symbolic-link src dst t))))))
     ;; 2. Symlink the vendored byobu config files into ~/.config/byobu.
     (let ((src-dir (expand-file-name "byobu" repo))
           (dst-dir (expand-file-name "~/.config/byobu")))
@@ -699,13 +714,13 @@ buffers, window layout, and project terminals."
               (cmd "~/.claude/hooks/inside-emacs-context"))
           (when (and (file-readable-p settings) (fboundp 'json-parse-string))
             (condition-case err
-                (let ((text (with-temp-buffer (insert-file-contents settings)
-                                              (buffer-string))))
+                (let* ((text (with-temp-buffer (insert-file-contents settings)
+                                               (buffer-string)))
+                       (data (json-parse-string text)) ; hash-tables = mutable form
+                       (changed nil))
+                  ;; (a) append our hook to each existing SessionStart matcher.
                   (unless (string-search cmd text)
-                    ;; parse as hash-tables (native JSON's mutable form), append
-                    ;; our hook to each existing SessionStart matcher, write back.
-                    (let* ((data (json-parse-string text))
-                           (hooks (gethash "hooks" data))
+                    (let* ((hooks (gethash "hooks" data))
                            (ss (and hooks (gethash "SessionStart" hooks))))
                       (when (and ss (> (length ss) 0))
                         (dotimes (i (length ss))
@@ -715,10 +730,23 @@ buffers, window layout, and project terminals."
                             (puthash "type" "command" mh)
                             (puthash "command" cmd mh)
                             (puthash "hooks" (vconcat hs (vector mh)) entry)))
-                        (with-temp-file settings
-                          (insert (json-serialize data)))))))
+                        (setq changed t))))
+                  ;; (b) allowlist the vendored eopen/esay scripts, so Claude runs
+                  ;;     them without a permission prompt.
+                  (let* ((perms (or (gethash "permissions" data)
+                                    (let ((h (make-hash-table :test 'equal)))
+                                      (puthash "permissions" h data) h)))
+                         (allow (or (gethash "allow" perms) (vector))))
+                    (dolist (rule '("Bash(eopen:*)" "Bash(esay:*)" "Bash(enotify:*)"
+                                    "Bash(ecommit:*)"))
+                      (unless (seq-contains-p allow rule)
+                        (setq allow (vconcat allow (vector rule)) changed t)))
+                    (puthash "allow" allow perms))
+                  (when changed
+                    (with-temp-file settings
+                      (insert (json-serialize data)))))
               (error
-               (message "inside-emacs hook: left settings.json alone (%S)" err)))))))))
+               (message "inside-emacs setup: left settings.json alone (%S)" err)))))))))
 
 (add-hook 'after-init-hook #'my-ensure-shell-integration)
 
@@ -1084,6 +1112,69 @@ remembering this buffer to come back to."
                        (if buf (my-ghostel--enter-from buf src) (my-project-tab nil))))
               (t     (my-project-tab nil))))))               ; prompt (open projects first)
 
+  (defun my-ghostel-open-referenced-file ()
+    "Open a file Claude referenced in the visible terminal.
+Scans the visible region for tool forms -- `Write(path)' / `Edit(path)' /
+`Read(path)' / `Update(path)' etc. -- and opens the one you pick (or the only
+one) in the other window, resolved against the terminal's directory.  A robust
+stand-in for clicking, since the TUI owns the mouse.  Bound to `C-t C-f'."
+    (interactive)
+    (let* ((text (buffer-substring-no-properties (window-start) (window-end nil t)))
+           (re (concat "\\_<\\(?:Write\\|Edit\\|Read\\|Update\\|Create\\|"
+                       "MultiEdit\\|NotebookEdit\\)(\\([^),\n]+\\)"))
+           (paths nil) (pos 0))
+      (while (string-match re text pos)
+        (push (string-trim (match-string 1 text)) paths)
+        (setq pos (match-end 1)))
+      (setq paths (delete-dups paths))   ; most-recent (bottom of screen) first
+      (let ((choice (cond ((null paths) (user-error "No file references on screen"))
+                          ((null (cdr paths)) (car paths))
+                          (t (completing-read "Open referenced file: " paths nil nil)))))
+        ;; open in THIS window (no surprise split); C-t C-t toggles back.
+        (find-file (expand-file-name choice default-directory)))))
+
+  ;; --- "task done, come back" notice -------------------------------------------
+  ;; `esay' messages vanish on the next echo; this one persists in the frame
+  ;; title (WM bar, visible even when Emacs is unfocused) and the mode line until
+  ;; you return to a terminal.  The `enotify' script calls `my-claude-notify'.
+  (defvar my-claude--notice nil
+    "Pending \"Claude is ready\" notice, shown in the frame title and mode line
+until you next select a terminal.  Set by `my-claude-notify' / `enotify'.")
+
+  (defun my-claude-notify (&optional msg)
+    "Raise a persistent notice (frame title + mode-line flag + an echo line) that
+a background/long task finished, so you can switch back.  Cleared automatically
+when you next select a terminal buffer."
+    (interactive)
+    (setq my-claude--notice (or msg "ready"))
+    (force-mode-line-update t)
+    (message "🔔 Claude: %s" my-claude--notice))
+
+  (defun my-claude-clear-notice (&rest _)
+    "Clear `my-claude--notice' (frame title + mode-line flag)."
+    (interactive)
+    (when my-claude--notice
+      (setq my-claude--notice nil)
+      (force-mode-line-update t)))
+
+  (defun my-claude--clear-on-terminal (&rest _)
+    "Clear the notice once a terminal is the selected window (you came back)."
+    (when (and my-claude--notice
+               (provided-mode-derived-p
+                (buffer-local-value 'major-mode (window-buffer (selected-window)))
+                'ghostel-mode))
+      (my-claude-clear-notice)))
+  (add-hook 'window-selection-change-functions #'my-claude--clear-on-terminal)
+
+  ;; Persist the notice on the frame title and the mode line (both clear with it).
+  (setq frame-title-format
+        '((my-claude--notice (:eval (concat "🔔 " my-claude--notice "  —  ")))
+          (multiple-frames "%b" ("" "%b - GNU Emacs at " system-name))))
+  (add-to-list 'global-mode-string
+               '(my-claude--notice
+                 (:eval (propertize (concat "🔔 " my-claude--notice " ") 'face 'warning)))
+               t)
+
   ;; C-t is a real PREFIX keymap (not a command — a command can't host a chord).
   ;; C-t C-t toggles code<->this project's terminal; C-t C-c/C-g/C-s pick a tab.
   ;; (A C-g *after* the C-t prefix is a normal key, not a quit, so it binds fine.)
@@ -1097,6 +1188,7 @@ remembering this buffer to come back to."
       (define-key map (kbd "C-n") #'my-byobu-new-window)    ; new window (ask name)
       (define-key map (kbd "C-k") #'my-byobu-close-window)  ; close (default: current)
       (define-key map (kbd "C-y") #'my-send-region-to-claude) ; cite region to claude
+      (define-key map (kbd "C-f") #'my-ghostel-open-referenced-file) ; open file Claude referenced
       ;; Any other key (a plain letter) -> type-to-filter window switch, seeded
       ;; with that key: C-t t -> test, C-t <type a name> -> that window.  So the
       ;; mnemonic chords are kept AND every window (incl. test/custom) is one
@@ -1514,6 +1606,10 @@ remembering this buffer to come back to."
 
 (use-package magit
   :commands (magit-status magit-dispatch)
+  :custom
+  ;; No separate diff window when committing -- the commit buffer already lists
+  ;; the staged files, made clickable/RET-openable by `my-git-commit-linkify-files'.
+  (magit-commit-show-diff nil)
   :config
   ;; Terminal `git commit' / `git rebase -i' run with $GIT_EDITOR=emacsclient
   ;; (see ~/.bashrc).  emacsclient opens the COMMIT_EDITMSG / git-rebase-todo
@@ -1522,7 +1618,69 @@ remembering this buffer to come back to."
   ;; with the with-editor finish (C-c C-c) / cancel (C-c C-k) keys — giving the
   ;; "perfect rebase mode" from any ghostel/byobu shell.
   (require 'git-commit)
-  (require 'git-rebase))
+  (require 'git-rebase)
+
+  ;; Commits are prepared as a magit commit buffer to REVIEW, never `git commit
+  ;; -m' blind.  The `ecommit' script sets `my-magit--prefill' and calls
+  ;; `my-magit-commit', which opens the commit buffer pre-filled with the message
+  ;; for the STAGED changes -- finish with C-c C-c, abort with C-c C-k.
+  (defvar my-magit--prefill nil
+    "Message to pre-fill the next magit commit buffer with (consumed once).")
+  (defun my-magit--prefill-insert ()
+    (when my-magit--prefill
+      (save-excursion (goto-char (point-min)) (insert my-magit--prefill))
+      (setq my-magit--prefill nil)))
+  (add-hook 'git-commit-setup-hook #'my-magit--prefill-insert)
+  (defun my-magit-commit (msg &optional dir)
+    "Open a magit commit buffer for DIR's staged changes, pre-filled with MSG,
+for the user to review and finish (C-c C-c) / abort (C-c C-k)."
+    (require 'magit)
+    (let ((default-directory (or dir default-directory)))
+      (setq my-magit--prefill msg)
+      (magit-commit-create)
+      ;; with-editor spawns git asynchronously; the commit buffer appears only
+      ;; when git invokes the editor.  Pump the event loop until it's up, so a
+      ;; caller (the `ecommit' script) returns once it's ready -- no races.
+      (let ((n 0))
+        (while (and (< n 50)
+                    (not (seq-find (lambda (b) (buffer-local-value 'git-commit-mode b))
+                                   (buffer-list))))
+          (sit-for 0.1) (setq n (1+ n))))))
+
+  ;; Make the staged-file lines in the commit buffer clickable + RET-openable
+  ;; (dashboard-style), so you can jump to a changed file from the message.
+  (defvar my-git-commit-file-button-map
+    (let ((m (make-sparse-keymap)))
+      (define-key m (kbd "RET") #'push-button)
+      m)
+    "Keymap on commit-buffer file buttons: RET opens (point elsewhere = newline).")
+  (defun my-git-commit--open-file (button)
+    ;; COMMIT_EDITMSG lives in .git/, so `default-directory' is the .git dir --
+    ;; resolve the (worktree-relative) path against the worktree root instead.
+    ;; Open in THIS window (like the dashboard) -- no surprise split to dismiss;
+    ;; the commit buffer is one `C-x b' / `C-t C-t' away.
+    (let ((root (or (magit-toplevel) default-directory)))
+      (find-file (expand-file-name (button-get button 'my-file) root))))
+  (defun my-git-commit-linkify-files ()
+    "Buttonize the file names in the commit buffer's status comments.
+Defensive -- a failure here must never block the commit buffer from opening."
+    (ignore-errors
+     (save-excursion
+      (goto-char (point-min))
+      (while (re-search-forward
+              (concat "^#[ \t]+\\(?:modified\\|new file\\|deleted\\|renamed\\|"
+                      "copied\\|typechange\\|both [a-z]+\\):[ \t]+\\(.+\\)$")
+              nil t)
+        (let* ((beg (match-beginning 1)) (end (match-end 1))
+               (raw (string-trim (match-string 1)))
+               (path (if (string-match " -> \\(.+\\)\\'" raw) (match-string 1 raw) raw)))
+          (make-text-button beg end
+                            'my-file path
+                            'action #'my-git-commit--open-file
+                            'follow-link t
+                            'keymap my-git-commit-file-button-map
+                            'help-echo (format "Open %s (RET / click)" path)))))))
+  (add-hook 'git-commit-setup-hook #'my-git-commit-linkify-files))
 
 (use-package treesit
   :ensure nil

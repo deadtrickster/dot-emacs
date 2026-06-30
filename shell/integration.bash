@@ -137,15 +137,11 @@ if [[ "${INSIDE_EMACS%%,*}" = 'ghostel' || "$TERM" = 'xterm-ghostty' ]]; then
         export GIT_EDITOR='emacsclient'
         export GIT_SEQUENCE_EDITOR='emacsclient'
 
-        # Non-blocking "open in Emacs"; resolve to absolute paths.
-        _ec_open() {
-            local args=() f
-            for f in "${@:-.}"; do args+=("$(realpath -m -- "$f")"); done
-            emacsclient -n -- "${args[@]}"
-        }
-        e()     { _ec_open "$@"; }
-        emacs() { _ec_open "$@"; }
-        open()  { _ec_open "$@"; }
+        # Interactive shortcuts -> the vendored `eopen' script (one impl, shared
+        # with Claude; `my-ensure-shell-integration' puts it on PATH).
+        e()     { eopen "$@"; }
+        emacs() { eopen "$@"; }
+        open()  { eopen "$@"; }
     fi
 
     # Directory tracking (OSC 7).  Only needed inside tmux/byobu, passthrough-wrapped.

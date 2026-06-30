@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Open a magit commit buffer in the user's Emacs, pre-filled with the message,
+# for the STAGED changes -- they review and finish (C-c C-c) or abort (C-c C-k).
+# This is how commits are made here: prepared + reviewed in magit, never
+# `git commit -m' blind.  Stage first (git add ...).
+# Message from: args, `-F FILE', or stdin.
+#
+# The message is written to a temp file that Emacs reads -- it is NEVER
+# interpolated into the shell, so backticks / quotes / $ in the message are safe.
+# Vendored; symlinked onto PATH by `my-ensure-shell-integration'.
+# Allowlist: Bash(ecommit:*)
+set -euo pipefail
+tmp=$(mktemp "${TMPDIR:-/tmp}/ecommit.XXXXXX")
+if   [ "${1:-}" = "-F" ]; then cat -- "$2" > "$tmp"
+elif [ "$#" -gt 0 ];      then printf '%s\n' "$*" > "$tmp"
+else                          cat > "$tmp"; fi
+# Only the temp path and $PWD touch the shell here; both are plain paths.
+emacsclient -e "(my-magit-commit (with-temp-buffer (insert-file-contents \"$tmp\") (buffer-string)) \"$PWD\")" >/dev/null
+rm -f "$tmp"

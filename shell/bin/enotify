@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Raise a PERSISTENT "task done / Claude is ready" notice in the user's Emacs:
+# frame title (WM bar, visible even while Emacs is unfocused) + a mode-line flag
+# + an echo line -- so they can switch back.  It clears when they return to a
+# terminal.  Use this for background/long-task-done signals; use `esay' for quick
+# transient messages.  Vendored; symlinked onto PATH by
+# `my-ensure-shell-integration'.  Allowlist with: Bash(enotify:*)
+set -euo pipefail
+msg="${*:-ready}"
+esc=$(printf '%s' "$msg" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')
+exec emacsclient -e "(my-claude-notify \"$esc\")" >/dev/null

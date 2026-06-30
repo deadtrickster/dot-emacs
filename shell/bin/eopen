@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Open file(s) in the user's running Emacs, non-blocking, resolved to absolute
+# paths.  Standalone so it works from a NON-interactive shell (e.g. Claude Code's
+# Bash tool, which never sources ~/.bashrc) and distinctly named so it never
+# clashes with /usr/bin/open.  Vendored here; symlinked onto PATH (~/.local/bin)
+# by `my-ensure-shell-integration'.  Allowlist in Claude with: Bash(eopen:*)
+set -euo pipefail
+args=()
+for f in "${@:-.}"; do args+=("$(realpath -m -- "$f")"); done
+exec emacsclient -n -- "${args[@]}"

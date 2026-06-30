@@ -8,11 +8,32 @@ You're in a **ghostel** terminal (an in-Emacs libghostty terminal) inside a
   `git-commit` / `git-rebase` modes) and **blocks until they finish** (`C-c C-c`
   to accept, `C-c C-k` to cancel). Pass `-m` / `-F` / `--no-edit` when you don't
   want an editor.
-- **Open files in their Emacs** with `e <file>` / `open <file>` (non-blocking) —
-  use this to surface a file instead of dumping it into the terminal.
-- **`say <msg>`** posts a message into Emacs.
+- **Commit via `ecommit <msg>`, not `git commit -m`.** Stage with `git add`, then
+  `ecommit "<message>"` opens a magit commit buffer *pre-filled* with the message
+  for the STAGED changes; the user reviews and finishes with `C-c C-c` (or aborts
+  with `C-c C-k`). Use `-F <file>` (or stdin) for multi-line messages. Commits
+  here are reviewed in magit — don't `-m` them blind.
+- **Open files in their Emacs** with `eopen <file>` (non-blocking) — use it to
+  surface a file instead of dumping it into the terminal. (`eopen`/`esay` are
+  standalone scripts on PATH and pre-approved; the bare `open`/`e`/`say` are
+  interactive-shell-only functions you don't have and `open` would hit
+  `/usr/bin/open` — always use the `e`-prefixed scripts.)
+- **"Write X and show me" → write it, then `eopen X`.** When asked to create or
+  edit a file *and* show it ("write README.md and show me", "open it"), do the
+  write, then `eopen <file>` so it pops up in their Emacs. The buffer
+  auto-reverts, so further edits to the file appear live there — prefer this over
+  pasting file contents into the terminal.
+- **`esay <msg>`** posts a *transient* message into their Emacs echo area.
+- **`enotify <msg>` when you finish and are handing back** — a long/background
+  task (build, test run, big edit) *or* simply the end of your turn when they may
+  have switched away while you worked. It raises a *persistent* notice (frame
+  title + mode-line flag + an echo line) so they know to switch back to you; it
+  clears when they return to a terminal. Use `enotify` for "come back / done"
+  signals and `esay` for quick transient ones.
 - **The user navigates with `C-t`** (a prefix): `C-t C-c` claude, `C-t C-g` git,
   `C-t C-s` shell, and `C-t C-t` toggles between their code buffer and this
-  terminal — so they hop away and back; you share the one byobu session.
+  terminal — so they hop away and back; you share the one byobu session. They
+  can also `C-t C-f` to open any file you name in your output (Write/Edit/Read
+  etc.) — so just reference files by path; no need to paste them.
 - `bb` (re)attaches this project's byobu session from any shell; the working
   directory is tracked back into Emacs via OSC 7.
