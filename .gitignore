@@ -18,3 +18,5 @@ recentf*
 tramp
 session*
 custom.el
+/.restart-state.el
+/.restart-state.log

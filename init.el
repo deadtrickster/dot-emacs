@@ -548,10 +548,13 @@ mouse-3: Next buffer" mouse-face mode-line-highlight local-map
   (unless (server-running-p)
     (server-start)))
 
-;; `M-x my-restart-everything': kill the project byobu sessions, restart Emacs,
-;; then bring back the open file buffers, the window layout, AND the project
-;; terminals.  We stash an explicit snapshot (file list + `window-state' +
-;; terminal project roots) rather than lean on `desktop' (whose hook-driven
+;; Session save/restore.  On EVERY exit (`kill-emacs-hook' — so a plain `C-x C-c'
+;; or a laptop shutdown counts) we stash an explicit snapshot (file list +
+;; `window-state' + frame geometry + terminal project roots); on the next launch
+;; `emacs-startup-hook' reopens the files, re-creates the project terminals, and
+;; puts the layout back, then consumes the snapshot.  `M-x my-restart-everything'
+;; is the same snapshot plus killing the project byobu sessions and an explicit
+;; `restart-emacs'.  We stash rather than lean on `desktop' (whose hook-driven
 ;; restore is unreliable).  Since `window-state' references buffers by name, the
 ;; re-created ghostel terminals (deterministic names) land back in their panes.
 (use-package emacs
@@ -560,19 +563,53 @@ mouse-3: Next buffer" mouse-face mode-line-highlight local-map
     (expand-file-name ".restart-state.el" user-emacs-directory)
     "Where `my-restart-everything' stashes the session snapshot across a restart.")
 
-  (defun my-restart--terminal-dirs ()
-    "Project root of every live ghostel terminal buffer — one entry per project.
-Dedups by the projectile root (not raw `default-directory'), so terminals from
-different projects all come back and a terminal whose cwd drifted into a subdir
-(OSC 7 tracking) still maps to the right project session."
-    (delete-dups
-     (delq nil (mapcar (lambda (b)
-                         (with-current-buffer b
-                           (when (derived-mode-p 'ghostel-mode)
-                             (or (ignore-errors
-                                   (projectile-project-root default-directory))
-                                 default-directory))))
-                       (buffer-list)))))
+  (defvar my-restart--log-file
+    (expand-file-name ".restart-state.log" user-emacs-directory)
+    "Where the last session-restore records what it did (for debugging).")
+
+  (defun my-restart--log (fmt &rest args)
+    "Append a line to `my-restart--log-file' (never signals)."
+    (ignore-errors
+      (write-region (concat (apply #'format fmt args) "\n")
+                    nil my-restart--log-file 'append 'silent)))
+
+  (defun my-restart--terminals ()
+    "Every live ghostel terminal as (BUFFER-NAME . PROJECT-ROOT), deduped by name.
+The exact buffer NAME is saved (not just the dir) so restore can recreate each
+terminal under the SAME name — `window-state' references buffers by name, so a
+name mismatch would leave the terminal out of its pane."
+    (let (acc)
+      (dolist (b (buffer-list))
+        (with-current-buffer b
+          (when (derived-mode-p 'ghostel-mode)
+            (let ((name (buffer-name b)))
+              (unless (assoc name acc)
+                (push (cons name
+                            (or (ignore-errors
+                                  (projectile-project-root default-directory))
+                                default-directory))
+                      acc))))))
+      (nreverse acc)))
+
+  (defun my-restart--make-terminal (bufname root)
+    "Recreate a ghostel terminal named exactly BUFNAME, rooted at ROOT, via `bb'.
+Named as saved so `window-state-put' matches it back into its pane."
+    (require 'ghostel)
+    (when (and (stringp bufname) (stringp root) (file-directory-p root)
+               (not (get-buffer bufname)))
+      (let* ((default-directory root)
+             (project (or (ignore-errors (projectile-project-root root)) root))
+             (pname (ignore-errors (projectile-project-name project)))
+             (process-environment
+              (if pname (cons (concat "PROJECTILE_PROJECT_NAME=" pname)
+                              process-environment)
+                process-environment))
+             (ghostel-buffer-name bufname)
+             (buffer (ghostel)))
+        (with-current-buffer buffer
+          (setq-local my-ghostel--project project)
+          (ghostel-send-string "bb\n"))
+        buffer)))
 
   (defun my-restart--kill-byobu ()
     "Kill the per-project byobu/tmux sessions (projectile/*)."
@@ -585,12 +622,13 @@ different projects all come back and a terminal whose cwd drifted into a subdir
         (when (string-prefix-p "projectile/" s)
           (call-process "tmux" nil nil nil "kill-session" "-t" (concat "=" s))))))
 
-  (defun my-restart-everything ()
-    "Kill the project byobu sessions, restart Emacs, then restore the open file
-buffers, window layout, and project terminals."
-    (interactive)
-    (when (yes-or-no-p "Kill byobu sessions and restart Emacs (restoring after)? ")
-      (save-some-buffers)
+  (defun my-restart--save-state ()
+    "Snapshot the session (open files, window layout, frame geometry, project
+terminals) to `my-restart--state-file' for restore on the next startup.
+Wrapped so a snapshot failure can never block Emacs from quitting.  Runs on
+`kill-emacs-hook' (so a plain `C-x C-c' / laptop shutdown restores next boot)
+and from `my-restart-everything'."
+    (ignore-errors
       (with-temp-file my-restart--state-file
         (prin1 (list :files (delq nil (mapcar #'buffer-file-name (buffer-list)))
                      :frame (let ((f (selected-frame)))
@@ -600,8 +638,16 @@ buffers, window layout, and project terminals."
                                     (cons 'left   (frame-parameter f 'left))
                                     (cons 'top    (frame-parameter f 'top))))
                      :windows (window-state-get (frame-root-window) t)
-                     :terminals (my-restart--terminal-dirs))
-               (current-buffer)))
+                     :terminals (my-restart--terminals))
+               (current-buffer)))))
+
+  (defun my-restart-everything ()
+    "Kill the project byobu sessions, restart Emacs, then restore the open file
+buffers, window layout, and project terminals."
+    (interactive)
+    (when (yes-or-no-p "Kill byobu sessions and restart Emacs (restoring after)? ")
+      (save-some-buffers)
+      (my-restart--save-state)
       (my-restart--kill-byobu)
       (restart-emacs)))
 
@@ -613,15 +659,26 @@ buffers, window layout, and project terminals."
                                       (read (current-buffer))))))
         (delete-file my-restart--state-file)   ; consume even on partial restore
         (when data
+          (ignore-errors (write-region "" nil my-restart--log-file nil 'silent)) ; fresh log
+          (my-restart--log "restore begin: %d files, %d terminals"
+                           (length (plist-get data :files))
+                           (length (plist-get data :terminals)))
           ;; 1. reopen the files (so window-state can place them by name)
           (dolist (f (plist-get data :files))
             (when (and (stringp f) (file-exists-p f))
-              (ignore-errors (find-file-noselect f))))
-          ;; 2. re-create the project terminals (same buffer names as before)
-          (dolist (dir (plist-get data :terminals))
-            (when (and (stringp dir) (file-directory-p dir))
-              (let ((default-directory dir))
-                (ignore-errors (my-project-tab "shell")))))
+              (if (ignore-errors (find-file-noselect f) t)
+                  (my-restart--log "file ok:  %s" f)
+                (my-restart--log "file FAIL: %s" f))))
+          ;; 2. re-create the project terminals under their EXACT saved names.
+          (dolist (term (plist-get data :terminals))
+            (cond
+             ((consp term)             ; (name . root) -- recreate by exact name
+              (ignore-errors (my-restart--make-terminal (car term) (cdr term)))
+              (my-restart--log "term %s: %s -> present=%s" (car term) (cdr term)
+                               (and (get-buffer (car term)) t)))
+             ((and (stringp term) (file-directory-p term)) ; back-compat: bare dir
+              (let ((default-directory term))
+                (ignore-errors (my-project-tab "shell"))))))
           ;; 3. restore frame geometry (window-state covers only the inner
           ;;    layout, not the frame's own size/position/maximized state)
           (ignore-errors
@@ -635,11 +692,23 @@ buffers, window layout, and project terminals."
                        (cons 'height (alist-get 'height fp))
                        (cons 'left   (alist-get 'left fp))
                        (cons 'top    (alist-get 'top fp)))))))
-          ;; 4. restore the window layout last, now that the buffers exist
-          (ignore-errors
-            (window-state-put (plist-get data :windows) (frame-root-window) t))))))
+          ;; 4. apply the window layout on a short timer -- AFTER the dashboard,
+          ;;    the ghostel terminal display, and any other startup reflow have
+          ;;    run, and after slow buffers settle, so our layout is the final
+          ;;    word.  Doing it synchronously here let late reflows clobber panes.
+          (let ((ws (plist-get data :windows)))
+            (run-at-time
+             0.3 nil
+             (lambda ()
+               (ignore-errors (window-state-put ws (frame-root-window) t))
+               (my-restart--log "layout applied; windows: %S"
+                                (mapcar (lambda (w) (buffer-name (window-buffer w)))
+                                        (window-list))))))))))
   :config
-  (add-hook 'emacs-startup-hook #'my-restart--maybe-restore))
+  (add-hook 'emacs-startup-hook #'my-restart--maybe-restore)
+  ;; First half: snapshot on every exit so a plain `C-x C-c' / laptop shutdown
+  ;; comes back next launch (the startup hook restores + consumes the file).
+  (add-hook 'kill-emacs-hook #'my-restart--save-state))
 
 ;; Monorepo self-install: this .emacs.d repo also vendors the shell + byobu
 ;; integration (shell/integration.bash, byobu/*).  Ensure, idempotently at
@@ -1076,7 +1145,14 @@ ghostel buffer redraws whichever tab ends up selected."
                      session window dir cmd (1- tries)))
        ;; Window exists -> select it.
        ((zerop (call-process "tmux" nil nil nil "select-window" "-t" tgt)) nil)
-       ;; Window missing (legacy layout) -> create, pin name, run CMD, select.
+       ;; Window missing, but a fresh `bb' may still be spawning its default tabs
+       ;; (claude/shell/git/test one by one) -> keep WAITING rather than racing bb
+       ;; into a duplicate window.  Only fall through to create as a last resort,
+       ;; for a genuinely custom tab bb never makes.
+       ((> tries 2)
+        (run-at-time 0.25 nil #'my-projectile--byobu-ensure-window
+                     session window dir cmd (1- tries)))
+       ;; Still missing after the wait -> create, pin name, run CMD, select.
        (t
         (call-process "tmux" nil nil nil "new-window" "-t" (format "=%s" session)
                       "-n" window "-c" dir)
@@ -1266,10 +1342,26 @@ when you next select a terminal buffer."
     "Switch to previously open buffer."
     (interactive)
     (switch-to-prev-buffer (selected-window) 1))
+  (defun my-ghostel--name-by-project (_title)
+    "Deterministic ghostel buffer name — one naming path for every terminal.
+Ignores the OSC-2 TITLE (byobu/shells set noisy titles that used to rename the
+buffer) and names by the buffer's project instead, derived from
+`default-directory'.  So a terminal keeps a stable `*ghostel PROJECT*' name
+however it was created — the `C-t' launchers, session restore, or a bare
+`M-x ghostel' all converge on the same name (a second terminal in one project
+just gets a `<2>' suffix).  This is what makes save/restore match reliably."
+    (let* ((root (or (ignore-errors (projectile-project-root default-directory))
+                     default-directory))
+           (name (or (ignore-errors (projectile-project-name root))
+                     (abbreviate-file-name (directory-file-name root)))))
+      (format "*ghostel %s*" name)))
   :custom
-  ;; Keep the project-derived buffer name fixed (as vterm did): disable
-  ;; OSC-2 title tracking so the shell/byobu can't rename the buffer.
-  (ghostel-set-title-function nil)
+  ;; One naming path: name every terminal by its project, ignoring OSC-2 title
+  ;; noise (byobu/shells).  Keeps the name fixed per project (the old intent)
+  ;; AND canonicalises buffers made by any path, so `window-state' save/restore
+  ;; always matches.  (Was `ghostel-set-title-function nil', which only disabled
+  ;; renaming and so let divergent names — e.g. `*ghostel ~/.emacs.d/*' — persist.)
+  (ghostel-buffer-name-function #'my-ghostel--name-by-project)
   ;; Rendering for Claude Code (run directly in ghostel via C-t C-c).  Ink does
   ;; aggressive partial screen updates and emits >256 bytes per keystroke, so the
   ;; default incremental path + 256-byte immediate-redraw budget defers the frame
