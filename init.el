@@ -740,7 +740,7 @@ buffers, window layout, and project terminals."
     ;;     they stay executable even if git didn't preserve the mode.
     (let ((bin-src (expand-file-name "shell/bin" repo))
           (bin-dst (expand-file-name "~/.local/bin")))
-      (dolist (f '("eopen" "esay" "enotify" "ecommit"))
+      (dolist (f '("eopen" "esay" "enotify" "ecommit" "ebuffer" "esh"))
         (let ((src (expand-file-name f bin-src))
               (dst (expand-file-name f bin-dst)))
           (when (file-exists-p src)
@@ -807,7 +807,7 @@ buffers, window layout, and project terminals."
                                       (puthash "permissions" h data) h)))
                          (allow (or (gethash "allow" perms) (vector))))
                     (dolist (rule '("Bash(eopen:*)" "Bash(esay:*)" "Bash(enotify:*)"
-                                    "Bash(ecommit:*)"))
+                                    "Bash(ecommit:*)" "Bash(ebuffer:*)" "Bash(esh:*)"))
                       (unless (seq-contains-p allow rule)
                         (setq allow (vconcat allow (vector rule)) changed t)))
                     (puthash "allow" allow perms))
@@ -972,6 +972,7 @@ code."
   (defun my-project-tab-claude (&optional arg) "Select the byobu `claude' tab." (interactive "P") (my-project-tab "claude" arg))
   (defun my-project-tab-git    (&optional arg) "Select the byobu `git' tab."    (interactive "P") (my-project-tab "git"    arg))
   (defun my-project-tab-shell  (&optional arg) "Select the byobu `shell' tab."  (interactive "P") (my-project-tab "shell"  arg))
+  (defun my-project-tab-sudo   (&optional arg) "Select the byobu `sudo' tab (an `esh'-spawned window awaiting your password)." (interactive "P") (my-project-tab "sudo" arg))
 
   (defun my-byobu--windows (project)
     "List of (INDEX NAME ACTIVE) for PROJECT's byobu windows, in tmux order.
@@ -1071,18 +1072,12 @@ can be selected.  (Bound to `C-t C-k'; copy mode is `C-c C-t', no clash.)"
         (call-process "tmux" nil nil nil "kill-window"
                       "-t" (format "=%s:%d" (my-byobu--session project) idx)))))
 
-  (defun my-send-region-to-claude (start end)
-    "Cite the region to the project's byobu `claude' tab, wrapped in a code fence.
-Bracketed-pasted, so it lands as one block in Claude's input without submitting,
-then focus moves to the claude tab so you can add a question.  If the current
-buffer isn't under a project, ask which running project session to send to.
-Bound to `C-t C-y'."
-    (interactive "r")
-    (unless (use-region-p) (user-error "Select a region first"))
-    (let* ((text (let ((sel (buffer-substring-no-properties start end)))
-                   (if (string-match-p "\n" sel)
-                       (concat "```\n" sel "\n```\n") ; multi-line -> fenced block
-                     (concat "`" sel "`"))))          ; single line -> inline code
+  (defun my-claude--send-to-tab (text)
+    "Bracketed-paste TEXT into the current project's byobu `claude' tab and focus
+it (without swapping the current window's buffer, which would hide the fresh
+paste).  No project -> ask which running session.  Records the source buffer so
+`C-t C-t' returns here.  Shared by the region-cite and buffer-reference commands."
+    (let* ((src (current-buffer))
            (root (ignore-errors (projectile-project-root default-directory)))
            (session
             (or (and root (my-byobu--session root))
@@ -1094,35 +1089,49 @@ Bound to `C-t C-y'."
                                             "list-sessions" "-F" "#{session_name}"))
                             "\n" t))))
                   (unless ss (user-error "No project byobu sessions running"))
-                  (completing-read "Cite to session: " ss nil t))))
+                  (completing-read "Send to session: " ss nil t))))
            (target (concat "=" session ":claude")))
       (unless (zerop (call-process "tmux" nil nil nil "select-window" "-t" target))
         (user-error "No `claude' tab in %s (open it with C-t C-c)" session))
-      ;; sticky association: an unprojected buffer now belongs to this session,
-      ;; so `C-t C-t' from here returns to its terminal.
-      (unless root (setq my-ghostel--cited-session session))
+      (unless root (setq my-ghostel--cited-session session)) ; sticky association
       (with-temp-buffer
         (insert text)
         (call-process-region (point-min) (point-max) "tmux" nil nil nil
                              "load-buffer" "-b" "emacs-cite" "-"))
       (call-process "tmux" nil nil nil
                     "paste-buffer" "-d" "-p" "-b" "emacs-cite" "-t" target)
-      (deactivate-mark)
-      ;; Move focus to the window already showing this session's terminal — do
-      ;; NOT swap the current window's buffer (that re-renders ghostel and hides
-      ;; the fresh paste until you type).  Only open it if nothing shows it.
-      (let* ((src (current-buffer))
-             (gbuf (my-byobu--ghostel-buffer session))
+      (let* ((gbuf (my-byobu--ghostel-buffer session))
              (win (and gbuf (get-buffer-window gbuf))))
-        ;; per-terminal return: C-t C-t from this terminal comes back to where we
-        ;; cited from (the `my-project-tab' branch records this itself).
         (when (and gbuf (not (provided-mode-derived-p
                               (buffer-local-value 'major-mode src) 'ghostel-mode)))
           (with-current-buffer gbuf (setq-local my-ghostel--return-buffer src)))
-        (cond (win  (select-window win))            ; byobu visible -> refocus it, no swap
-              (root (my-project-tab "claude"))       ; not visible -> open project byobu claude
-              (gbuf (pop-to-buffer gbuf))))          ; ask-path, hidden buffer -> reveal
-      (message "Cited %d chars to %s:claude" (- end start) session)))
+        (cond (win  (select-window win))       ; byobu visible -> refocus, no swap
+              (root (my-project-tab "claude"))  ; not visible -> open project claude
+              (gbuf (pop-to-buffer gbuf))))))   ; ask-path, hidden -> reveal
+
+  (defun my-send-region-to-claude (start end)
+    "Cite the region to the project's byobu `claude' tab (single line as inline
+code, multi-line as a fenced block), then focus the claude tab to add a question.
+No project -> ask which running session.  Bound to `C-t C-y'."
+    (interactive "r")
+    (unless (use-region-p) (user-error "Select a region first"))
+    (let ((sel (buffer-substring-no-properties start end)))
+      (my-claude--send-to-tab
+       (if (string-match-p "\n" sel) (concat "```\n" sel "\n```\n") (concat "`" sel "`"))))
+    (deactivate-mark)
+    (message "Cited region to claude"))
+
+  (defun my-cite-buffer-to-claude ()
+    "Pick a buffer (`C-x b'-style) and send a *reference* to it -- a path Claude
+can Read, not the pasted content -- to the project's claude tab, then focus it.
+A saved, unmodified file gives its real path; anything else a live snapshot.
+Bound to `C-t C-b': the no-jank way to point Claude at a specific buffer (the
+picker runs natively in Emacs, not via a remote `read-buffer')."
+    (interactive)
+    (let* ((name (read-buffer "Reference buffer to Claude: " nil t))
+           (path (my-ebuffer-ref name)))
+      (my-claude--send-to-tab (format "Please Read this buffer for me: %s\n" path))
+      (message "Referenced %s to claude" name)))
 
   (defun my-projectile--byobu-window (session)
     "Return the active tmux window name in SESSION (\"\" if not running)."
@@ -1209,6 +1218,30 @@ stand-in for clicking, since the TUI owns the mouse.  Bound to `C-t C-f'."
         ;; open in THIS window (no surprise split); C-t C-t toggles back.
         (find-file (expand-file-name choice default-directory)))))
 
+  (defun my-ebuffer-ref (&optional which)
+    "Return a file path whose contents represent a buffer, for the `ebuffer'
+script -- so Claude can Read the buffer you mean without you pasting it.
+WHICH is nil for the byobu return buffer (\"this/that/the buffer\"), or a
+buffer-name string.  A saved, unmodified file buffer yields its own path;
+anything else (unsaved edits, a non-file buffer) is snapshotted to a temp file
+first.  (To *pick* a buffer, the user runs `C-t C-b' in Emacs -- no remote
+`read-buffer' here, which tangled with the terminal.)"
+    (let ((buf (cond ((and (stringp which) (not (string-empty-p which)))
+                      (get-buffer which))
+                     (t (and (buffer-live-p my-ghostel--return-buffer)
+                             my-ghostel--return-buffer)))))
+      (unless (buffer-live-p buf)
+        (user-error "ebuffer: no buffer (the user can pick one with C-t C-b)"))
+      (with-current-buffer buf
+        (if (and buffer-file-name (not (buffer-modified-p)))
+            buffer-file-name
+          (let ((tmp (expand-file-name
+                      (concat "ebuffer-"
+                              (replace-regexp-in-string "[^A-Za-z0-9._-]+" "_" (buffer-name)))
+                      temporary-file-directory)))
+            (write-region (point-min) (point-max) tmp nil 'silent)
+            tmp)))))
+
   ;; --- "task done, come back" notice -------------------------------------------
   ;; `esay' messages vanish on the next echo; this one persists in the frame
   ;; title (WM bar, visible even when Emacs is unfocused) and the mode line until
@@ -1242,6 +1275,15 @@ when you next select a terminal buffer."
       (my-claude-clear-notice)))
   (add-hook 'window-selection-change-functions #'my-claude--clear-on-terminal)
 
+  (defun my-claude--clear-on-terminal-input ()
+    "Clear the notice once you act inside a terminal — typing, or switching byobu
+tabs with `C-t C-s' (e.g. to run an `esh'-queued sudo command), doesn't change
+the selected Emacs window, so `window-selection-change-functions' alone misses
+it.  Guarded on the notice being set, so it's a cheap no-op the rest of the time."
+    (when (and my-claude--notice (derived-mode-p 'ghostel-mode))
+      (my-claude-clear-notice)))
+  (add-hook 'post-command-hook #'my-claude--clear-on-terminal-input)
+
   ;; Persist the notice on the frame title and the mode line (both clear with it).
   (setq frame-title-format
         '((my-claude--notice (:eval (concat "🔔 " my-claude--notice "  —  ")))
@@ -1261,10 +1303,12 @@ when you next select a terminal buffer."
       (define-key map (kbd "C-c") #'my-project-tab-claude)
       (define-key map (kbd "C-g") #'my-project-tab-git)
       (define-key map (kbd "C-s") #'my-project-tab-shell)
+      (define-key map (kbd "C-u") #'my-project-tab-sudo)    ; jump to esh's sudo window
       (define-key map (kbd "C-n") #'my-byobu-new-window)    ; new window (ask name)
       (define-key map (kbd "C-k") #'my-byobu-close-window)  ; close (default: current)
       (define-key map (kbd "C-y") #'my-send-region-to-claude) ; cite region to claude
       (define-key map (kbd "C-f") #'my-ghostel-open-referenced-file) ; open file Claude referenced
+      (define-key map (kbd "C-b") #'my-cite-buffer-to-claude)        ; reference a buffer to claude
       ;; Any other key (a plain letter) -> type-to-filter window switch, seeded
       ;; with that key: C-t t -> test, C-t <type a name> -> that window.  So the
       ;; mnemonic chords are kept AND every window (incl. test/custom) is one

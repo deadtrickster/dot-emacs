@@ -23,6 +23,28 @@ You're in a **ghostel** terminal (an in-Emacs libghostty terminal) inside a
   write, then `eopen <file>` so it pops up in their Emacs. The buffer
   auto-reverts, so further edits to the file appear live there — prefer this over
   pasting file contents into the terminal.
+- **"this / that / the buffer" → run `ebuffer`, then `Read` what it prints.** When
+  the user refers to a buffer deictically ("what do you think about that buffer?",
+  "this buffer", "the file I'm in"), they mean the one they last toggled from.
+  `ebuffer` prints a path -- the real file if saved & unmodified, else a temp
+  snapshot capturing unsaved edits / non-file buffers (scratch, REPL, output) --
+  which you then `Read`. If they *name* a buffer, run `ebuffer <name>`. To pick a
+  *specific* one from a list, they press `C-t C-b` in Emacs (a native picker that
+  sends you the reference) — don't try to pop a selector yourself. Never make them
+  paste a whole buffer — fetch it.
+- **`sudo` commands → `esh`, never run them yourself.** You have no password, so
+  any command needing `sudo` will just fail. Hand it off with this three-step
+  dance (ONLY for privileged/`sudo` commands — everything else you run normally):
+  1. `esh "sudo apt install ripgrep"` opens a *dedicated* `sudo` byobu window
+     (the user's `shell` tab stays untouched), runs the command there (the
+     password prompt appears), raises a notice, and prints an `id=<N>`.
+  2. Immediately run **`esh -w <id>` in the BACKGROUND** (`run_in_background`). It
+     blocks until the command finishes and returns `EXIT=<code>` plus the captured
+     output — that completion is the signal that wakes you back up. Tell the user
+     to hit `C-t C-u` (jumps to the `sudo` window) and enter their password.
+  3. When `esh -w` returns, report the exit code / output, then **`esh -k <id>`**
+     to close the sudo window and clean up. You close it — never the user, and it
+     never auto-closes.
 - **`esay <msg>`** posts a *transient* message into their Emacs echo area.
 - **`enotify <msg>` when you finish and are handing back** — a long/background
   task (build, test run, big edit) *or* simply the end of your turn when they may

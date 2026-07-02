@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# Run a command Claude CAN'T run itself -- one that needs `sudo' (a password) --
+# in a DEDICATED, throwaway byobu window, so the user's `shell' tab stays
+# untouched.  Claude has no password, so instead of failing it hands the command
+# to the human: `esh "sudo ..."' opens a new `sudo' window, runs the command
+# there (the password prompt shows), and raises a notice.  The user jumps over
+# (C-t C-u), enters their password, and it runs.  ONLY for sudo/privileged
+# commands -- everything else Claude just runs.
+#
+# Three modes (all under one allowlist entry -- Bash(esh:*)):
+#   esh "sudo apt install rg"   launch: new window, run it, notify; prints an id
+#   esh -w <id>                 wait (Claude runs this in BACKGROUND): blocks
+#                               until the command finishes, prints EXIT=<code>
+#                               and the captured output -- the "signal back"
+#   esh -k <id>                 kill the sudo window + clean up (after reporting)
+#
+# The launch prints the id; Claude then backgrounds `esh -w <id>' to be woken on
+# completion, reports the result, and `esh -k <id>' closes the window.
+# Allowlist: Bash(esh:*)
+set -euo pipefail
+
+state_dir() {
+  local d
+  d=$(git rev-parse --absolute-git-dir 2>/dev/null || printf '%s' "${TMPDIR:-/tmp}")
+  printf '%s/esh' "$d"
+}
+
+case "${1:-}" in
+  -w)                                    # block until done (run in background)
+    id="${2:?usage: esh -w <id>}"; sd=$(state_dir)
+    exitf="$sd/$id.exit"; win=$(cat "$sd/$id.win" 2>/dev/null || true)
+    while [ ! -f "$exitf" ]; do
+      # window gone before it finished -> user closed/aborted it
+      if [ -n "$win" ] && ! tmux list-windows -a -F '#{window_id}' 2>/dev/null \
+                             | grep -qx "$win"; then
+        echo "EXIT=aborted (sudo window closed before the command finished)"
+        exit 0
+      fi
+      sleep 2
+    done
+    echo "EXIT=$(cat "$exitf")"
+    echo "--- output ---"
+    cat "$sd/$id.out" 2>/dev/null || true
+    ;;
+  -k)                                    # close the window + clean up
+    id="${2:?usage: esh -k <id>}"; sd=$(state_dir)
+    win=$(cat "$sd/$id.win" 2>/dev/null || true)
+    [ -n "$win" ] && tmux kill-window -t "$win" 2>/dev/null || true
+    rm -f "$sd/$id.win" "$sd/$id.exit" "$sd/$id.out"
+    ;;
+  "")
+    echo "usage: esh <sudo-command> | esh -w <id> | esh -k <id>" >&2; exit 2
+    ;;
+  *)                                     # launch
+    cmd="$*"
+    sd=$(state_dir); mkdir -p "$sd"
+    id="$$"
+    out="$sd/$id.out"; exitf="$sd/$id.exit"; winf="$sd/$id.win"
+    : > "$out"; rm -f "$exitf"
+    sess=$(tmux display-message -p '#S')
+    win=$(tmux new-window -t "=$sess" -n sudo -c "$PWD" -P -F '#{window_id}')
+    printf '%s' "$win" > "$winf"
+    # run the command, tee its output to a file, record the exit code -- the
+    # sudo prompt still reads from the tty, so it's interactive in that window.
+    wrapped="{ $cmd ; } 2>&1 | tee $(printf '%q' "$out"); echo \${PIPESTATUS[0]} > $(printf '%q' "$exitf")"
+    tmux send-keys -t "$win" -l -- "$wrapped"
+    tmux send-keys -t "$win" Enter
+    enotify "sudo waiting in a new 'sudo' window (C-t C-u) -- enter your password: $cmd"
+    echo "esh: id=$id window=$win"
+    echo "esh: await with 'esh -w $id' (background); close with 'esh -k $id'"
+    ;;
+esac
