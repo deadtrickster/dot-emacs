@@ -81,6 +81,15 @@ bb() {
     fi
     [[ ${#names[@]} -eq 0 ]] && names=("${__BB_DEFAULT_WINDOWS[@]}")
 
+    # De-dup while preserving order, so a stale/corrupt layout file (or an old
+    # duplicated session captured by bb-save-layout) can't spawn twin windows.
+    local -a uniq=(); local -A seen=(); local n
+    for n in "${names[@]}"; do
+        [[ -z "$n" || -n "${seen[$n]:-}" ]] && continue
+        seen[$n]=1; uniq+=("$n")
+    done
+    names=("${uniq[@]}")
+
     local first=1 name cmd
     for name in "${names[@]}"; do
         [[ -z "$name" ]] && continue
@@ -160,6 +169,26 @@ if [[ "${INSIDE_EMACS%%,*}" = 'ghostel' || "$TERM" = 'xterm-ghostty' ]]; then
             *) PROMPT_COMMAND="__ghostel_osc7;${PROMPT_COMMAND}" ;;
         esac
         __ghostel_osc7
+
+        # Per-byobu-window bash history.  Stock bash funnels every shell into one
+        # ~/.bash_history, so up-arrow in one window replays commands from all the
+        # others (merged by exit order).  Give each window its own file, keyed by
+        # session + window name, under ~/.bash_history.d -- loaded at shell start
+        # (not the shared file) and appended on every prompt (`history -a', no
+        # -c/-r, so windows never cross-contaminate) so an abrupt shutdown keeps
+        # it.  Outside tmux the shell keeps stock ~/.bash_history.
+        __bb_hist_key=$(tmux display-message -p '#{session_name}__#{window_name}' \
+                        2>/dev/null | tr -d '\n' | tr -c 'A-Za-z0-9_.-' '_')
+        if [[ -n "$__bb_hist_key" ]]; then
+            mkdir -p "$HOME/.bash_history.d"
+            HISTFILE="$HOME/.bash_history.d/$__bb_hist_key"
+            history -c; history -r 2>/dev/null   # this window's history, not the shared one
+            case ";${PROMPT_COMMAND};" in
+                *";history -a;"*) ;;
+                *) PROMPT_COMMAND="history -a;${PROMPT_COMMAND}" ;;
+            esac
+        fi
+        unset __bb_hist_key
     fi
 
     say() { ghostel_cmd message "%s" "$*"; }

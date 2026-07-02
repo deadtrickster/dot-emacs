@@ -55,7 +55,8 @@ New features go on a clean branch on top of trunk (`master`):
   never writes a tracked file. The bootstrap (require package, install
   use-package) and `early-init.el` are the only non-`use-package` top-level code.
 - **Verify before trusting.** After editing `init.el`:
-  `emacs -Q --batch --eval '(with-temp-buffer (insert-file-contents "init.el") (check-parens))'`
+  `emacs -Q --batch --eval '(with-temp-buffer (insert-file-contents "init.el") (emacs-lisp-mode) (check-parens))'`
+  (the `(emacs-lisp-mode)` matters — without it the check runs in `fundamental-mode` and miscounts parens inside comments/strings, false-failing on this file).
 - **Apply live; don't force restarts.** An Emacs server runs (`server-start`).
   Prefer `emacsclient -e` (or loading a temp lexical-binding `.el`) over asking the
   user to restart. Native modules (ghostel) are the exception — they need a restart.

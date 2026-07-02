@@ -1340,6 +1340,10 @@ it.  Guarded on the notice being set, so it's a cheap no-op the rest of the time
      (bookmarks . 5)
      (projects . 5)
      (registers . 5)))
+  ;; This config drives projects through projectile (bb, the C-t launchers,
+  ;; `my-project-root'); the default `project-el' backend has an empty list here,
+  ;; so the Projects section showed nothing.  Read from projectile instead.
+  (dashboard-projects-backend 'projectile)
   :config
   (dashboard-setup-startup-hook))
 
