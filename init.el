@@ -581,7 +581,11 @@ name mismatch would leave the terminal out of its pane."
     (let (acc)
       (dolist (b (buffer-list))
         (with-current-buffer b
-          (when (derived-mode-p 'ghostel-mode)
+          ;; Skip ephemeral grouped VIEWS (`my-ghostel-grouped-view') -- they're
+          ;; throwaway peers; restoring one via plain `bb' would make a bogus
+          ;; second direct-attach instead of a grouped view.
+          (when (and (derived-mode-p 'ghostel-mode)
+                     (not my-ghostel--view-session))
             (let ((name (buffer-name b)))
               (unless (assoc name acc)
                 (push (cons name
@@ -916,6 +920,48 @@ instead of asking for a folder.  Lives for the buffer's lifetime.")
 it from inside the terminal instead of re-detecting -- crucial when the folder
 isn't a git/projectile project yet.")
 
+  (defvar my-ghostel--view-counter 0
+    "Monotonic counter for unique grouped-view session names (see
+`my-ghostel-grouped-view').")
+
+  (defvar-local my-ghostel--view-session nil
+    "For a grouped-VIEW terminal, its own tmux session name (`…^vN').
+Set by `my-ghostel-grouped-view'.  Non-nil marks this buffer as a view, so the
+`C-t' tab launchers switch THIS view's tab (its grouped session shares the base
+session's windows) instead of popping the main terminal.")
+
+  (defun my-ghostel--delete-window-safely (win)
+    "Delete WIN if it is a live, non-sole window.  Deferred grouped-view cleanup
+helper -- passed as a timer ARG (not a closure), so it fires regardless of
+binding mode."
+    (when (and (window-live-p win) (window-parent win))
+      (ignore-errors (delete-window win))))
+
+  (defun my-ghostel--kill-tmux-session (name)
+    "Kill tmux session NAME (a grouped view).  Deferred cleanup helper."
+    (call-process "tmux" nil nil nil "kill-session" "-t" (concat "=" name)))
+
+  (defun my-ghostel--view-cleanup ()
+    "Kill-buffer-hook for a grouped VIEW: fold its window, reap its tmux session.
+
+Windows: mark them dedicated so `kill-buffer's own `replace-buffer-in-windows'
+DELETES them, instead of filling the freed window with the main terminal buffer
+-- one ghostel buffer shown in a second window flips into a stuck copy-mode.
+Dedicating only at kill time keeps the window normal during use (toggle/switch
+work).  A deferred `delete-window' backstops it.
+
+Tmux: kill ONLY the view's own `…^vN' session (never the shared base -- the regex
+guard makes a base name impossible to match), DEFERRED so its teardown can't race
+the window resize above (that combination once wedged the sibling terminal).
+Done in Emacs so it is reliable however the PTY died -- `C-x k' hard-kills it, so
+the shell-side trap never runs."
+    (let ((wins (get-buffer-window-list (current-buffer) nil t)))
+      (dolist (w wins) (ignore-errors (set-window-dedicated-p w t)))
+      (dolist (w wins) (run-at-time 0 nil #'my-ghostel--delete-window-safely w)))
+    (when (and (stringp my-ghostel--view-session)
+               (string-match-p "\\^v[0-9]+\\'" my-ghostel--view-session))
+      (run-at-time 0 nil #'my-ghostel--kill-tmux-session my-ghostel--view-session)))
+
   (defun my-byobu--session (project)
     "tmux session name for PROJECT, sanitized like `bb' (./: -> _)."
     (concat "projectile/"
@@ -940,6 +986,17 @@ shell), an integer selects that window index — unambiguous when names clash.
 All tabs share one ghostel buffer; `my-ghostel-toggle-terminal' returns to your
 code."
     (require 'ghostel)
+    (if (bound-and-true-p my-ghostel--view-session)
+        ;; In a grouped VIEW, switch THAT view's own tab and stay put -- don't pop
+        ;; the main terminal.  The view is its own tmux session sharing the base
+        ;; session's windows, so selecting there moves only this pane.
+        (progn
+          (when window
+            (call-process "tmux" nil nil nil "select-window"
+                          "-t" (if (integerp window)
+                                   (format "=%s:%d" my-ghostel--view-session window)
+                                 (format "=%s:%s" my-ghostel--view-session window))))
+          (current-buffer))
     (let* ((src (current-buffer))
            (project (my-project-root))
            (name (projectile-project-name project))
@@ -966,13 +1023,89 @@ code."
              (my-projectile--byobu-ensure-window
               session window project (cdr (assoc window my-project-tab-commands)))))
       ;; WINDOW nil -> leave the session's active tab as-is (the toggle wants this)
-      buffer))
+      buffer)))
 
   (defun my-project-tab-test   (&optional arg) "Select the byobu `test' tab."   (interactive "P") (my-project-tab "test"   arg))
   (defun my-project-tab-claude (&optional arg) "Select the byobu `claude' tab." (interactive "P") (my-project-tab "claude" arg))
   (defun my-project-tab-git    (&optional arg) "Select the byobu `git' tab."    (interactive "P") (my-project-tab "git"    arg))
   (defun my-project-tab-shell  (&optional arg) "Select the byobu `shell' tab."  (interactive "P") (my-project-tab "shell"  arg))
   (defun my-project-tab-sudo   (&optional arg) "Select the byobu `sudo' tab (an `esh'-spawned window awaiting your password)." (interactive "P") (my-project-tab "sudo" arg))
+
+  (defun my-ghostel--read-view-tab ()
+    "Read a grouped-view starting tab from a prefix arg (nil = auto-pick)."
+    (when current-prefix-arg
+      (let ((w (read-string "Grouped view starting tab (blank = auto): ")))
+        (unless (string-empty-p w) w))))
+
+  (defun my-ghostel-grouped-view (&optional window direction)
+    "Split and open another INDEPENDENT view of this project's byobu session.
+Opens a fresh ghostel buffer attached via `bb -g' -- its own grouped tmux session
+that SHARES the base session's windows but keeps its own active tab AND its own
+scrollback.  So you can split off as many panes as you like (like file buffers)
+and watch different byobu windows side by side, each scrolling independently --
+e.g. several live-stat windows at once.
+
+Peers, not children: the persistent byobu session is never destroyed by closing
+these (only the ephemeral view is), and \"main\" (the base-named `*ghostel P*'
+buffer) matters only as the `C-t C-t'-from-a-file target.
+
+By default the view opens on a DIFFERENT tab than the base session is showing (so
+two panes never fight over one window's size).  WINDOW, a tab name, picks the
+starting tab (prefix arg prompts; blank = auto).  DIRECTION is `right' (default)
+or `below' for where to split -- `my-ghostel-split-view-right'/`-below' (bound to
+`C-x 3'/`C-x 2' in a terminal) pass it."
+    (interactive (list (my-ghostel--read-view-tab) 'right))
+    (require 'ghostel)
+    (let* ((project (my-project-root))
+           (name (projectile-project-name project))
+           (session (my-byobu--session project))
+           (view-session (format "%s^v%d" session
+                                 (setq my-ghostel--view-counter
+                                       (1+ my-ghostel--view-counter))))
+           (src (current-buffer))
+           (default-directory project)
+           (process-environment
+            (append (list (concat "PROJECTILE_PROJECT_NAME=" name)
+                          (concat "BB_VIEW_SESSION=" view-session))
+                    process-environment)))
+      ;; The byobu session must exist to group with -- but it lives on the tmux
+      ;; server, so this works even with no Emacs terminal currently open for it.
+      (unless (eq 0 (call-process "tmux" nil nil nil "has-session"
+                                  "-t" (concat "=" session)))
+        (user-error "No byobu session for %s yet -- start it first (C-t C-t)" name))
+      (select-window (if (eq direction 'below) (split-window-below) (split-window-right)))
+      (let ((buffer (ghostel t)))          ; `t' = fresh buffer -> own `*ghostel NAME*<N>'
+        (with-current-buffer buffer
+          ;; Stamp project + view identity so `my-project-root' and the C-t tab
+          ;; launchers resolve to THIS view (switch its own tab, not the main's).
+          (setq-local my-ghostel--project project)
+          (setq-local my-ghostel--view-session view-session)
+          ;; `C-t C-t' from here returns to the buffer we split from.
+          (setq-local my-ghostel--return-buffer src)
+          ;; Close = reap the view's tmux session + drop this window (deferred),
+          ;; reliably from Emacs -- see `my-ghostel--view-cleanup'.
+          (add-hook 'kill-buffer-hook #'my-ghostel--view-cleanup nil t)
+          ;; A view is throwaway -> `C-x k' shouldn't prompt.  ghostel gates the
+          ;; kill via `ghostel-query-before-killing' (a `kill-buffer-query-functions'
+          ;; hook), NOT a process flag -- so quiet that, buffer-locally.
+          (setq-local ghostel-query-before-killing nil)
+          (ghostel-send-string
+           (if window (format "bb -g %s\n" (shell-quote-argument window)) "bb -g\n")))
+        buffer)))
+
+  (defun my-ghostel-split-view-right (&optional window)
+    "Split right into an INDEPENDENT grouped view of this project's byobu session.
+DWIM `C-x 3' inside a ghostel terminal: a naive split would show the same PTY in
+two windows (torn -- no independent tab/scroll), so open a grouped view instead.
+See `my-ghostel-grouped-view'."
+    (interactive (list (my-ghostel--read-view-tab)))
+    (my-ghostel-grouped-view window 'right))
+
+  (defun my-ghostel-split-view-below (&optional window)
+    "Split below into an INDEPENDENT grouped view (DWIM `C-x 2' in a terminal).
+See `my-ghostel-split-view-right' / `my-ghostel-grouped-view'."
+    (interactive (list (my-ghostel--read-view-tab)))
+    (my-ghostel-grouped-view window 'below))
 
   (defun my-byobu--windows (project)
     "List of (INDEX NAME ACTIVE) for PROJECT's byobu windows, in tmux order.
@@ -1183,7 +1316,15 @@ remembering this buffer to come back to."
         (if (and (buffer-live-p my-ghostel--return-buffer)
                  (not (eq my-ghostel--return-buffer (current-buffer))))
             (switch-to-buffer my-ghostel--return-buffer)
-          (switch-to-prev-buffer (selected-window) 1))
+          ;; No recorded return buffer (entered via session-restore, or the code
+          ;; buffer was killed) -> open THIS project's dired: a deterministic,
+          ;; same-project landing.  Never fall through to `switch-to-prev-buffer',
+          ;; which is project-blind and surfaced another project's terminal.
+          (let ((root (or (and (stringp my-ghostel--project) my-ghostel--project)
+                          default-directory)))
+            (if (and root (file-directory-p root))
+                (dired root)
+              (switch-to-prev-buffer (selected-window) 1))))
       (let* ((src (current-buffer))
              (root (ignore-errors
                      (let ((projectile-project-root-cache (make-hash-table :test 'equal)))
@@ -1465,7 +1606,13 @@ just gets a `<2>' suffix).  This is what makes save/restore match reliably."
   (define-key ghostel-mode-map [C-up] (ignore-error-wrapper 'windmove-up))
   (define-key ghostel-mode-map [C-down] (ignore-error-wrapper 'windmove-down))
   (define-key ghostel-mode-map [C-left] (ignore-error-wrapper 'windmove-left))
-  (define-key ghostel-mode-map [C-right] (ignore-error-wrapper 'windmove-right)))
+  (define-key ghostel-mode-map [C-right] (ignore-error-wrapper 'windmove-right))
+  ;; C-x 2 / C-x 3 in a terminal DWIM into a grouped VIEW: a naive split would show
+  ;; the same PTY in two windows (torn -- no independent tab/scroll), so split into
+  ;; a fresh grouped-view buffer instead.  (C-x is in `ghostel-keymap-exceptions',
+  ;; so it reaches Emacs.)  C-x 1 / C-x 0 stay stock (window ops, not closes).
+  (define-key ghostel-mode-map (kbd "C-x 3") #'my-ghostel-split-view-right)
+  (define-key ghostel-mode-map (kbd "C-x 2") #'my-ghostel-split-view-below))
 
 (use-package windmove
   :config

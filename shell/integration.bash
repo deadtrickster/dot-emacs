@@ -58,11 +58,70 @@ __bb_layout_file() {   # $1 = session name -> path to its saved layout file
 # shell (a separate terminal, VS Code, a subdirectory), deriving the project
 # name from the git top-level so it lands in the SAME session as Emacs.
 bb() {
+    # `bb -g [window]' opens a grouped VIEW instead of a direct attach (see below).
+    local grouped=0 startwin=""
+    if [[ "$1" == "-g" ]]; then grouped=1; shift; startwin="${1:-}"; fi
+
     local rawproj="${PROJECTILE_PROJECT_NAME:-$(basename "$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || echo "$PWD")")}"
     # tmux rewrites '.' and ':' in a session name to '_'; do it ourselves so our
     # explicit `=session:window' targets match the stored name (e.g. `.emacs.d').
     local proj="${rawproj//[.: ]/_}"
     local session="projectile/$proj"
+
+    # `bb -g [window]' — a second, INDEPENDENT view of this project's session: a
+    # grouped tmux session that shares the exact same windows but keeps its own
+    # active-window pointer, so a second Emacs pane can sit on a different tab.
+    # Two plain clients on one session move in lockstep; a grouped session is the
+    # tmux mechanism that decouples the active window.  Ephemeral: killed on
+    # detach, so the real session and its panes are never touched.
+    if (( grouped )); then
+        # Only meaningful from a fresh, non-tmux shell (tmux refuses to attach
+        # inside itself) — which is exactly what the Emacs command spawns.
+        if [[ -n "$TMUX" ]]; then
+            echo "bb -g: already inside tmux — run it from a fresh shell (M-x my-ghostel-grouped-view)." >&2
+            return 1
+        fi
+        if ! tmux has-session -t "=$session" 2>/dev/null; then
+            echo "bb -g: '$session' isn't running — start it with plain 'bb' first." >&2
+            return 1
+        fi
+        # Emacs mints the view name so it can target this view's tabs (C-t); fall
+        # back to a per-shell name for manual use.  '^' is tmux-safe (unlike '.'/':').
+        local view="${BB_VIEW_SESSION:-${session}^v$$}"
+        tmux has-session -t "=$view" 2>/dev/null \
+            || tmux new-session -d -t "=$session" -s "$view" || return 1
+        # Default the view to a DIFFERENT window than the base session is showing.
+        # Two grouped clients on the SAME window at different widths fight over its
+        # size (window-size latest) and tear each other's redraw — that's what
+        # briefly garbles the main terminal.  Landing apart avoids it: each window
+        # sizes cleanly to its sole viewer.  Selected BEFORE `attach' so the shared
+        # window never even momentarily gets a second viewer.
+        if [[ -z "$startwin" ]]; then
+            # Collect tabs already shown by the base session AND any sibling view,
+            # then land on one nobody's on — so several side-by-side views spread
+            # across different tabs by themselves.
+            local -A taken=(); local sname wactive wname w
+            while IFS='|' read -r sname wactive wname; do
+                [[ "$wactive" == 1 ]] || continue
+                [[ "$sname" == "$session" || "$sname" == "$session"^v* ]] || continue
+                taken["$wname"]=1
+            done < <(tmux list-windows -a \
+                     -F '#{session_name}|#{window_active}|#{window_name}' 2>/dev/null)
+            while IFS= read -r w; do
+                [[ -z "${taken[$w]:-}" ]] && { startwin="$w"; break; }
+            done < <(tmux list-windows -t "=$session" -F '#{window_name}' 2>/dev/null)
+            # Every tab already on screen -> accept the base's current one.
+            [[ -z "$startwin" ]] && startwin=$(tmux list-windows -t "=$session" \
+                -F '#{window_active} #{window_name}' 2>/dev/null | awk '$1==1{print $2; exit}')
+        fi
+        [[ -n "$startwin" ]] && tmux select-window -t "=$view:$startwin" 2>/dev/null
+        # Reap the ephemeral view however this throwaway shell ends: a clean
+        # detach (F6) returns from `attach' to the `exit' below; a buffer-kill
+        # sends SIGHUP.  Both fire the trap; kill-session is a no-op if gone.
+        trap "tmux kill-session -t '=$view' 2>/dev/null" EXIT HUP
+        tmux attach -t "=$view"                      # blocks until you detach
+        exit                                         # detach == full close (buffer too)
+    fi
 
     # Already running?  Just attach — its windows live in the tmux server.
     if tmux has-session -t "=$session" 2>/dev/null; then

@@ -80,6 +80,18 @@ New features go on a clean branch on top of trunk (`master`):
   dot-preserving name is kept in the `@project` tmux option.
 - Inside ghostel/byobu, `$EDITOR=emacsclient`, so `git commit` / `git rebase -i`
   open in the running Emacs (magit `git-commit` / `git-rebase` modes).
+- **Grouped views** — `C-x 2`/`C-x 3` inside a ghostel terminal DWIM into a
+  *second independent view* of the same byobu session (`my-ghostel-grouped-view` →
+  `bb -g`), not a naive same-buffer split (which would tear — one PTY can't render
+  independently in two windows). Each view is its own ghostel buffer attached to
+  an **ephemeral grouped tmux session** (`projectile/<name>^vN`) that shares the
+  base session's windows but keeps its own active tab + scrollback — so you can
+  watch several byobu windows side by side. Views default to a different tab than
+  the base is showing (auto-spread across free tabs). They're peers: the base
+  session persists regardless, cleanup (kill the `^vN` session, fold the window)
+  is Emacs-driven from `kill-buffer-hook` (hardened to never touch the base), and
+  views are excluded from session-restore. `C-t` tab launchers switch *that
+  view's* tab; `C-t C-t` returns to your code (or the project's dired).
 
 ## Gotchas
 
