@@ -267,6 +267,9 @@ mouse-3: Next buffer" mouse-face mode-line-highlight local-map
   :ensure nil
   :custom
   (blink-cursor-mode nil)
+  ;; Flash the frame instead of the audible bell (KDE now plays the system beep
+  ;; on every C-g / quit, which the old X setup swallowed).
+  (visible-bell t)
   (delete-selection-mode t)
   (column-number-mode t)
   ;; Show position as `line:column' (e.g. 12:5) instead of the default `(12,5)'.
@@ -486,6 +489,9 @@ mouse-3: Next buffer" mouse-face mode-line-highlight local-map
                         :strike-through nil :overline nil :underline nil
                         :slant normal :weight regular :height 95 :width normal
                         :foundry "GOOG" :family "Roboto Mono"))))
+  ;; Lucid-toolkit scrollbar takes its colour from this face; unspecified, it
+  ;; renders bright.  Match the background, muted thumb (readable on KDE).
+  (scroll-bar ((t (:background "#181a26" :foreground "#3a3f52"))))
   (compilation-error ((t (:foreground "#D9786B"))))
   (compilation-info ((t (:foreground "#A3A9CE" :weight normal))))
   (compilation-warning ((t (:inherit warning :foreground "#FDB262"))))
@@ -634,7 +640,16 @@ Wrapped so a snapshot failure can never block Emacs from quitting.  Runs on
 and from `my-restart-everything'."
     (ignore-errors
       (with-temp-file my-restart--state-file
-        (prin1 (list :files (delq nil (mapcar #'buffer-file-name (buffer-list)))
+        (prin1 (list :files (delq nil
+                             (mapcar (lambda (b)
+                                       (with-current-buffer b
+                                         ;; (FILE . POINT); skip terminals — a
+                                         ;; ghostel buffer's point is the PTY's,
+                                         ;; not a cursor to restore.
+                                         (when (and buffer-file-name
+                                                    (not (derived-mode-p 'ghostel-mode)))
+                                           (cons buffer-file-name (point)))))
+                                     (buffer-list)))
                      :frame (let ((f (selected-frame)))
                               (list (cons 'fullscreen (frame-parameter f 'fullscreen))
                                     (cons 'width  (frame-parameter f 'width))
@@ -667,12 +682,23 @@ buffers, window layout, and project terminals."
           (my-restart--log "restore begin: %d files, %d terminals"
                            (length (plist-get data :files))
                            (length (plist-get data :terminals)))
-          ;; 1. reopen the files (so window-state can place them by name)
-          (dolist (f (plist-get data :files))
-            (when (and (stringp f) (file-exists-p f))
-              (if (ignore-errors (find-file-noselect f) t)
-                  (my-restart--log "file ok:  %s" f)
-                (my-restart--log "file FAIL: %s" f))))
+          ;; 1. reopen the files (so window-state can place them by name) and
+          ;;    restore point.  Entries are (FILE . POINT); older snapshots stored
+          ;;    a bare FILE string, so accept both.  `window-state-put' already
+          ;;    restores point for DISPLAYED windows; this also covers files that
+          ;;    were open but not showing (which would otherwise land at bob).
+          (dolist (entry (plist-get data :files))
+            (let ((f (if (consp entry) (car entry) entry))
+                  (pos (and (consp entry) (cdr entry))))
+              (when (and (stringp f) (file-exists-p f))
+                (let ((buf (ignore-errors (find-file-noselect f))))
+                  (if buf
+                      (progn
+                        (when (integerp pos)
+                          (with-current-buffer buf
+                            (goto-char (min pos (point-max)))))
+                        (my-restart--log "file ok:  %s @%s" f pos))
+                    (my-restart--log "file FAIL: %s" f))))))
           ;; 2. re-create the project terminals under their EXACT saved names.
           (dolist (term (plist-get data :terminals))
             (cond
