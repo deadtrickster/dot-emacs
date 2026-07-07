@@ -30,6 +30,15 @@ with its own session.
 - **Predictable.** Each project comes up with the same tabs, so navigation is
   the same everywhere.
 
+### Several tabs at once
+
+Split a terminal pane — `C-x 3` beside, `C-x 2` below — to open another
+independent view of the same session on a *different* tab, with its own active
+tab and scrollback. So you can watch several tabs side by side (e.g. a few live
+stat or log windows) instead of flipping between them. Close a view like any
+buffer (`C-x k`); one command collapses all the extra views back to a single
+terminal. The views are throwaway — the session itself is never affected.
+
 ## Navigation (`C-t`)
 
 | Key | Action |
@@ -79,8 +88,9 @@ files, pane layout, window size, and each project's terminal.
 ## AI assistant
 
 When the Claude CLI runs in a project terminal, it is told it is inside the
-editor: it commits through the editor, can open files, and uses the same
-navigation.
+editor: it commits through the editor, can open files, uses the same navigation,
+and — instead of running something itself — can stage a command in a tab for you
+to review and run, or hand a command needing a password to a dedicated window.
 
 ## New machine
 
