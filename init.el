@@ -1536,7 +1536,7 @@ it.  Guarded on the notice being set, so it's a cheap no-op the rest of the time
   (dashboard-items
    '((recents . 30)
      (bookmarks . 5)
-     (projects . 5)
+     (projects . 15)
      (registers . 5)))
   ;; This config drives projects through projectile (bb, the C-t launchers,
   ;; `my-project-root'); the default `project-el' backend has an empty list here,
