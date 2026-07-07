@@ -770,7 +770,7 @@ buffers, window layout, and project terminals."
     ;;     they stay executable even if git didn't preserve the mode.
     (let ((bin-src (expand-file-name "shell/bin" repo))
           (bin-dst (expand-file-name "~/.local/bin")))
-      (dolist (f '("eopen" "esay" "enotify" "ecommit" "ebuffer" "esh"))
+      (dolist (f '("eopen" "esay" "enotify" "ecommit" "ebuffer" "esh" "etab"))
         (let ((src (expand-file-name f bin-src))
               (dst (expand-file-name f bin-dst)))
           (when (file-exists-p src)

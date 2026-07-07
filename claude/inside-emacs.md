@@ -52,6 +52,16 @@ You're in a **ghostel** terminal (an in-Emacs libghostty terminal) inside a
   title + mode-line flag + an echo line) so they know to switch back to you; it
   clears when they return to a terminal. Use `enotify` for "come back / done"
   signals and `esay` for quick transient ones.
+- **"put this / that command in the `<tab>` tab" → `etab <tab> -F <file>`.** When
+  they ask you to *stage* a command in a byobu tab for them to run (e.g. "put that
+  command into the test tab for me") — rather than running it yourself — write the
+  command to a scratchpad file and run `etab <tab> -F <file>` (a lone command, so
+  `Bash(etab:*)` doesn't trip; also avoids quoting a big string). It **types the
+  text into that tab and stops — no Enter** (sanitized so it can't execute itself:
+  CR/ESC/control stripped, bracketed paste), so they switch there (`C-t <tab>`),
+  review, and press Enter to run. Short one-liners can go inline: `etab test "…"`.
+  This is the inverse of `esh` (which runs a sudo command); `etab` never runs
+  anything. The `<tab>` is the byobu window name they said (`test`, `shell`, …).
 - **The user navigates with `C-t`** (a prefix): `C-t C-c` claude, `C-t C-g` git,
   `C-t C-s` shell, and `C-t C-t` toggles between their code buffer and this
   terminal — so they hop away and back; you share the one byobu session. They
