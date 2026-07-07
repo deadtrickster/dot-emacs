@@ -68,6 +68,10 @@ The prompt shows the current branch and working-tree state (modified, staged,
 stashed, untracked, ahead/behind upstream). The terminal tracks the working
 directory.
 
+Each tab keeps its own command history, so up-arrow in the `test` tab recalls
+what you ran there — not one stream interleaved across every tab of every
+project.
+
 ## Languages
 
 Completion, go-to-definition, diagnostics, and format-on-save are set up for:
@@ -80,17 +84,28 @@ automatically on entry. Per-project environment variables come from **direnv**:
 an `.envrc` in the repo (run `direnv allow` once) loads on entry and unloads on
 exit, and the editor and the project's terminals see the same environment.
 
-## Restart
+## Session persistence
 
-One command stops the terminals and editor, restarts, and restores the open
-files, pane layout, window size, and each project's terminal.
+Quitting the editor saves its session — the open files with their cursor
+positions, the pane layout, and the window size — and relaunching restores it,
+re-showing each project's terminal in place. (The terminals themselves never
+stopped; they keep running in the multiplexer either way — this restores the
+editor's view of them.) One command also restarts the whole setup — editor and
+terminals — and restores the same state in place.
 
 ## AI assistant
 
 When the Claude CLI runs in a project terminal, it is told it is inside the
-editor: it commits through the editor, can open files, uses the same navigation,
-and — instead of running something itself — can stage a command in a tab for you
-to review and run, or hand a command needing a password to a dedicated window.
+editor, and integrates both ways:
+
+- **You point it at things.** Cite the selected region (`C-t C-y`) or a whole
+  buffer (`C-t C-b`) instead of pasting; open a file it referenced in its output
+  (`C-t C-f`); jump to a password prompt it opened (`C-t C-u`).
+- **It works through the editor.** It commits through the editor (so you review
+  each commit), opens files for you, stages a command in a tab for you to run
+  rather than running it itself, hands a command needing a password to a
+  dedicated window, and raises a notice when it finishes or needs you — which
+  clears when you switch back.
 
 ## New machine
 
