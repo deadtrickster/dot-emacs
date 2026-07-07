@@ -1133,6 +1133,37 @@ See `my-ghostel-split-view-right' / `my-ghostel-grouped-view'."
     (interactive (list (my-ghostel--read-view-tab)))
     (my-ghostel-grouped-view window 'below))
 
+  (defun my-ghostel-collapse-to-main ()
+    "Close all of this project's grouped VIEWS and show its main terminal, alone.
+A composite of \"kill the secondaries\" + \"bring back the main\": kills every
+`my-ghostel-grouped-view' buffer whose grouped session belongs to this project
+\(each reaps its own `^vN' tmux session; the persistent base session is never
+touched), then shows the base-named `*ghostel P*' terminal in this window and
+makes it the sole window.  The undo for fanning out several side-by-side views."
+    (interactive)
+    (require 'ghostel)
+    (let* ((project (my-project-root))
+           (name (projectile-project-name project))
+           (session (my-byobu--session project))
+           (main-name (format "*ghostel %s*" name))
+           (killed 0))
+      ;; 1. kill the secondaries -- grouped views of THIS project's base session.
+      ;;    Each view's `kill-buffer-hook' reaps its own `^vN' session + window.
+      (dolist (b (buffer-list))
+        (let ((vs (and (buffer-live-p b)
+                       (buffer-local-value 'my-ghostel--view-session b))))
+          (when (and (stringp vs) (string-prefix-p (concat session "^v") vs))
+            (kill-buffer b)
+            (setq killed (1+ killed)))))
+      ;; 2. bring the main terminal into this window, alone (create it if the base
+      ;;    session is up but no Emacs buffer is showing it).
+      (let ((main (or (get-buffer main-name)
+                      (save-window-excursion (my-project-tab nil)))))
+        (when (buffer-live-p main)
+          (switch-to-buffer main)
+          (delete-other-windows)))
+      (message "Collapsed %d view%s into %s" killed (if (= killed 1) "" "s") main-name)))
+
   (defun my-byobu--windows (project)
     "List of (INDEX NAME ACTIVE) for PROJECT's byobu windows, in tmux order.
 Falls back to the default tab names if the session isn't running yet."
