@@ -1724,7 +1724,10 @@ just gets a `<2>' suffix).  This is what makes save/restore match reliably."
 (use-package eglot
   :commands lsp
   :custom
-  (eglot-ignored-server-capabilities '())
+  ;; Don't let servers reformat as you type: clangd (and others) advertise
+  ;; on-type formatting with `\n' as a trigger, so pressing RET reformats the
+  ;; line you just finished -- e.g. collapsing tab-aligned struct columns.
+  (eglot-ignored-server-capabilities '(:documentOnTypeFormattingProvider))
   :hook
   ((elixir-mode elixir-ts-mode heex-ts-mode) . eglot-ensure)
   (erlang-mode . eglot-ensure)
