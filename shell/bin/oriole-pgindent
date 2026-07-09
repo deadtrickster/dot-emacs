@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# apheleia formatter: format OrioleDB C on stdin via pgindent -> stdout, so
+# pgindent can be used like gofmt (format-on-save).  pgindent is a perl wrapper
+# around `pg_bsd_indent' that edits files in place and needs a typedefs list;
+# this adapts it to the stdin->stdout shape apheleia wants.
+#
+# Usage: oriole-pgindent <buffer-file-path>   (buffer content on stdin)
+#
+# `pgindent' + `pg_bsd_indent' must be on PATH -- install them once globally,
+# they rarely change (see the emacs config's setup notes).  The typedefs list is
+# taken from the file's repo root (orioledb.typedefs; regenerate occasionally
+# with `make USE_PGXS=1 orioledb.typedefs').  On ANY problem it emits the input
+# unchanged -- a safe no-op for apheleia, never a mangled buffer.
+set -euo pipefail
+
+src="${1:-$PWD}"
+
+# No toolchain -> passthrough (harmless on a machine without the pg build).
+if ! command -v pgindent >/dev/null 2>&1 || ! command -v pg_bsd_indent >/dev/null 2>&1; then
+    cat; exit 0
+fi
+
+repo=$(git -C "$(dirname "$src")" rev-parse --show-toplevel 2>/dev/null || true)
+td=()
+[ -n "$repo" ] && [ -f "$repo/orioledb.typedefs" ] && td=(--typedefs="$repo/orioledb.typedefs")
+
+tmp=$(mktemp --suffix=.c); orig=$(mktemp)
+trap 'rm -f "$tmp" "$orig"' EXIT
+cat | tee "$orig" > "$tmp"
+
+# pgindent edits $tmp in place; emit it on success, the pristine input on any
+# failure so a broken run can never corrupt the buffer.
+if pgindent "${td[@]}" "$tmp" >/dev/null 2>&1; then cat "$tmp"; else cat "$orig"; fi

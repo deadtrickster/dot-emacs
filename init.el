@@ -770,7 +770,8 @@ buffers, window layout, and project terminals."
     ;;     they stay executable even if git didn't preserve the mode.
     (let ((bin-src (expand-file-name "shell/bin" repo))
           (bin-dst (expand-file-name "~/.local/bin")))
-      (dolist (f '("eopen" "esay" "enotify" "ecommit" "ebuffer" "esh" "etab"))
+      (dolist (f '("eopen" "esay" "enotify" "ecommit" "ebuffer" "esh" "etab"
+                   "oriole-pgindent"))
         (let ((src (expand-file-name f bin-src))
               (dst (expand-file-name f bin-dst)))
           (when (file-exists-p src)
@@ -1853,7 +1854,34 @@ just gets a `<2>' suffix).  This is what makes save/restore match reliably."
   ;; reformats aggressively, fighting the 4-space editor indent.  Add a project
   ;; .clang-format if you want full formatting there.
   (dolist (m '(c-mode c++-mode c-ts-mode c++-ts-mode))
-    (setq apheleia-mode-alist (assq-delete-all m apheleia-mode-alist))))
+    (setq apheleia-mode-alist (assq-delete-all m apheleia-mode-alist)))
+  ;; ...but DO format OrioleDB C on save with pgindent -- its canonical formatter,
+  ;; gofmt-style.  `oriole-pgindent' wraps pgindent (a perl+pg_bsd_indent tool) as
+  ;; a stdin->stdout filter; scope it PER-BUFFER so only oriole checkouts get it,
+  ;; never other C projects.  Requires `pgindent'/`pg_bsd_indent' on PATH (install
+  ;; once) and a repo `orioledb.typedefs' (make USE_PGXS=1 orioledb.typedefs).
+  (setf (alist-get 'oriole-pgindent apheleia-formatters)
+        '("oriole-pgindent" filepath))   ; buffer content on stdin, path as $1
+  (defun my-oriole-c-file-p ()
+    "Non-nil when the current buffer is a C source in an OrioleDB checkout,
+detected by a dominating `orioledb.control' (the extension's control file)."
+    (and buffer-file-name
+         (locate-dominating-file buffer-file-name "orioledb.control")))
+  (defun my-oriole-pgindent-setup ()
+    "Turn on pgindent-via-apheleia format-on-save for an OrioleDB C buffer."
+    (when (my-oriole-c-file-p)
+      (setq-local apheleia-formatter 'oriole-pgindent)
+      (apheleia-mode 1)))
+  (add-hook 'c-ts-mode-hook #'my-oriole-pgindent-setup)
+  (add-hook 'c-mode-hook #'my-oriole-pgindent-setup))
+
+;; Respect per-project `.editorconfig' (built-in since Emacs 30).  Lets a repo
+;; set editor-side indentation by filename glob regardless of major mode -- e.g.
+;; OrioleDB's `.editorconfig' switches its C files to tab indentation (Postgres
+;; style) so typing there doesn't fight pgindent.
+(use-package editorconfig
+  :ensure nil
+  :hook (after-init . editorconfig-mode))
 
 (use-package bazel)
 
