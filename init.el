@@ -1883,6 +1883,36 @@ detected by a dominating `orioledb.control' (the extension's control file)."
   :ensure nil
   :hook (after-init . editorconfig-mode))
 
+;; Tame mouse-wheel acceleration, decoupled from `double-click-time'.  With
+;; `mouse-wheel-progressive-speed' on, mwheel multiplies each notch by the event
+;; click-count -- but its timing threshold is `double-click-time' (500ms), so
+;; almost any spin accelerates (little room for slow, deliberate scrolling) and
+;; it squares up too fast.  Replace that multiplier with our own: only notches
+;; closer together than `my-wheel-accel-window' accelerate, capped at
+;; `my-wheel-accel-cap'.  So a slow spin stays 1x; only a fast spin ramps up.
+;; Real mouse clicks fall through untouched.  (Pixel-smooth needs XInput2/PGTK.)
+(defvar my-wheel-accel-cap 2
+  "Maximum mouse-wheel acceleration factor (ceiling on the speed-up).")
+(defvar my-wheel-accel-window 0.1
+  "Seconds between wheel notches that still count as a fast spin.  SMALLER = more
+room for slow scrolling (you must spin faster to accelerate); larger ramps up
+more readily.")
+(defvar my-wheel--accel-last nil "Internal: time of the previous wheel notch.")
+(defvar my-wheel--accel-mult 1 "Internal: current acceleration multiplier.")
+(define-advice event-click-count (:around (orig event) my-cap-wheel-accel)
+  "Time-based, capped wheel-scroll acceleration; real clicks use the original."
+  (if (memq (event-basic-type event)
+            '(wheel-up wheel-down wheel-left wheel-right
+              mouse-4 mouse-5 mouse-6 mouse-7))
+      (let ((now (float-time)))
+        (if (and my-wheel--accel-last
+                 (< (- now my-wheel--accel-last) my-wheel-accel-window))
+            (setq my-wheel--accel-mult (min (1+ my-wheel--accel-mult) my-wheel-accel-cap))
+          (setq my-wheel--accel-mult 1))
+        (setq my-wheel--accel-last now)
+        my-wheel--accel-mult)
+    (funcall orig event)))
+
 (use-package bazel)
 
 (use-package grip-mode
