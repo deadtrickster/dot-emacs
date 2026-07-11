@@ -771,7 +771,7 @@ buffers, window layout, and project terminals."
     (let ((bin-src (expand-file-name "shell/bin" repo))
           (bin-dst (expand-file-name "~/.local/bin")))
       (dolist (f '("eopen" "esay" "enotify" "ecommit" "ebuffer" "esh" "etab"
-                   "oriole-pgindent"))
+                   "oriole-pgindent" "oriole-yapf"))
         (let ((src (expand-file-name f bin-src))
               (dst (expand-file-name f bin-dst)))
           (when (file-exists-p src)
@@ -1857,23 +1857,19 @@ just gets a `<2>' suffix).  This is what makes save/restore match reliably."
     (setq apheleia-mode-alist (assq-delete-all m apheleia-mode-alist)))
   ;; ...but DO format OrioleDB C on save with pgindent -- its canonical formatter,
   ;; gofmt-style.  `oriole-pgindent' wraps pgindent (a perl+pg_bsd_indent tool) as
-  ;; a stdin->stdout filter; scope it PER-BUFFER so only oriole checkouts get it,
-  ;; never other C projects.  Requires `pgindent'/`pg_bsd_indent' on PATH (install
-  ;; once) and a repo `orioledb.typedefs' (make USE_PGXS=1 orioledb.typedefs).
+  ;; a stdin->stdout filter.  Scope it to OrioleDB C/H by file PATH, resolved at
+  ;; SAVE time from `apheleia-mode-alist' -- not a mode hook, which would miss
+  ;; files session-restore reopens before this block has run.  (`apheleia-global-
+  ;; mode' turns `apheleia-mode' on; the formatter is looked up here.)  Needs
+  ;; `pgindent'/`pg_bsd_indent' on PATH and a repo `orioledb.typedefs'.
   (setf (alist-get 'oriole-pgindent apheleia-formatters)
         '("oriole-pgindent" filepath))   ; buffer content on stdin, path as $1
-  (defun my-oriole-c-file-p ()
-    "Non-nil when the current buffer is a C source in an OrioleDB checkout,
-detected by a dominating `orioledb.control' (the extension's control file)."
-    (and buffer-file-name
-         (locate-dominating-file buffer-file-name "orioledb.control")))
-  (defun my-oriole-pgindent-setup ()
-    "Turn on pgindent-via-apheleia format-on-save for an OrioleDB C buffer."
-    (when (my-oriole-c-file-p)
-      (setq-local apheleia-formatter 'oriole-pgindent)
-      (apheleia-mode 1)))
-  (add-hook 'c-ts-mode-hook #'my-oriole-pgindent-setup)
-  (add-hook 'c-mode-hook #'my-oriole-pgindent-setup))
+  (add-to-list 'apheleia-mode-alist '("/orioledb/.*\\.[ch]\\'" . oriole-pgindent))
+  ;; ...and yapf for OrioleDB Python (that's `make USE_PGXS=1 yapf'), same
+  ;; per-path scoping so it beats the global ruff formatter for oriole .py only.
+  ;; `oriole-yapf' runs yapf with the repo's `.style.yapf'; needs yapf on PATH.
+  (setf (alist-get 'oriole-yapf apheleia-formatters) '("oriole-yapf" filepath))
+  (add-to-list 'apheleia-mode-alist '("/orioledb/.*\\.py\\'" . oriole-yapf)))
 
 ;; Respect per-project `.editorconfig' (built-in since Emacs 30).  Lets a repo
 ;; set editor-side indentation by filename glob regardless of major mode -- e.g.

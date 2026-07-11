@@ -6,11 +6,12 @@
 #
 # Usage: oriole-pgindent <buffer-file-path>   (buffer content on stdin)
 #
-# `pgindent' + `pg_bsd_indent' must be on PATH -- install them once globally,
-# they rarely change (see the emacs config's setup notes).  The typedefs list is
-# taken from the file's repo root (orioledb.typedefs; regenerate occasionally
-# with `make USE_PGXS=1 orioledb.typedefs').  On ANY problem it emits the input
-# unchanged -- a safe no-op for apheleia, never a mangled buffer.
+# `pgindent' + `pg_bsd_indent' must be on PATH (install once).  The typedefs list
+# is taken from the file's repo root (orioledb.typedefs; regenerate occasionally
+# with `make USE_PGXS=1 orioledb.typedefs').  Runs in a private temp DIR because
+# pgindent drops `pgsrcXXXX.BAK' scratch files in its CWD -- apheleia runs us
+# inside the repo, so isolating + nuking the dir keeps the project clean.  On ANY
+# problem it emits the input unchanged -- a safe no-op for apheleia.
 set -euo pipefail
 
 src="${1:-$PWD}"
@@ -24,10 +25,16 @@ repo=$(git -C "$(dirname "$src")" rev-parse --show-toplevel 2>/dev/null || true)
 td=()
 [ -n "$repo" ] && [ -f "$repo/orioledb.typedefs" ] && td=(--typedefs="$repo/orioledb.typedefs")
 
-tmp=$(mktemp --suffix=.c); orig=$(mktemp)
-trap 'rm -f "$tmp" "$orig"' EXIT
-cat | tee "$orig" > "$tmp"
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+cat > "$work/orig.c"
+cp "$work/orig.c" "$work/in.c"
 
-# pgindent edits $tmp in place; emit it on success, the pristine input on any
-# failure so a broken run can never corrupt the buffer.
-if pgindent "${td[@]}" "$tmp" >/dev/null 2>&1; then cat "$tmp"; else cat "$orig"; fi
+# pgindent edits in.c in place (and litters .BAK here, not the repo); emit it on
+# success, the pristine input on any failure so a broken run never corrupts the
+# buffer.
+if ( cd "$work" && pgindent "${td[@]}" in.c ) >/dev/null 2>&1; then
+    cat "$work/in.c"
+else
+    cat "$work/orig.c"
+fi

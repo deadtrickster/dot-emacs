@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# apheleia formatter: format OrioleDB Python on stdin via yapf -> stdout, using
+# the repo's `.style.yapf' -- how `make USE_PGXS=1 yapf' formats the tests
+# (based_on_style pep8, use_tabs).  Passing --style explicitly makes it
+# cwd-independent.  `yapf' must be on PATH (install once).  On ANY problem it
+# emits the input unchanged -- a safe no-op for apheleia.
+set -euo pipefail
+
+src="${1:-$PWD}"
+command -v yapf >/dev/null 2>&1 || { cat; exit 0; }
+
+repo=$(git -C "$(dirname "$src")" rev-parse --show-toplevel 2>/dev/null || true)
+style=()
+[ -n "$repo" ] && [ -f "$repo/.style.yapf" ] && style=(--style="$repo/.style.yapf")
+
+in=$(mktemp); out=$(mktemp)
+trap 'rm -f "$in" "$out"' EXIT
+cat > "$in"
+if yapf "${style[@]}" < "$in" > "$out" 2>/dev/null; then cat "$out"; else cat "$in"; fi
