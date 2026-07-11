@@ -1515,6 +1515,16 @@ it.  Guarded on the notice being set, so it's a cheap no-op the rest of the time
       (define-key map [t] #'my-byobu-switch-window)
       map)
     "Prefix map bound to \\`C-t' (in the global map and `ghostel-mode-map').")
+  :custom
+  ;; Fast, INTERRUPTIBLE project indexing.  `alien' shells out to git -- skips
+  ;; gitignored dirs (a huge `build/'), respects .gitignore -- instead of a
+  ;; native elisp walk that ignores C-g (that walk hard-froze Emacs on a
+  ;; 51-submodule C++ repo).  Cache the file list; and DON'T recurse the 51
+  ;; submodules (their files aren't wanted in the project list, and enumerating
+  ;; them is the slow part).
+  (projectile-indexing-method 'alien)
+  (projectile-enable-caching t)
+  (projectile-git-submodule-command "")
   :config
   (global-set-key (kbd "C-t") my-ghostel-prefix-map)
   (define-key projectile-mode-map (kbd "s-p") 'projectile-command-map)
