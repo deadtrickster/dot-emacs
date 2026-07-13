@@ -115,12 +115,21 @@ bb() {
                 -F '#{window_active} #{window_name}' 2>/dev/null | awk '$1==1{print $2; exit}')
         fi
         [[ -n "$startwin" ]] && tmux select-window -t "=$view:$startwin" 2>/dev/null
-        # Reap the ephemeral view however this throwaway shell ends: a clean
-        # detach (F6) returns from `attach' to the `exit' below; a buffer-kill
-        # sends SIGHUP.  Both fire the trap; kill-session is a no-op if gone.
+        # Reap the ephemeral view however this shell ends: a clean detach (F6)
+        # returns from `attach' below; a buffer-kill sends SIGHUP -> the trap.
+        # kill-session is a no-op if already gone.
         trap "tmux kill-session -t '=$view' 2>/dev/null" EXIT HUP
         tmux attach -t "=$view"                      # blocks until you detach
-        exit                                         # detach == full close (buffer too)
+        tmux kill-session -t "=$view" 2>/dev/null    # detached -> reap the view now
+        # Emacs spawns us in a throwaway shell and wants F6 to close the ghostel
+        # buffer (BB_VIEW_SESSION is set); a manual `bb -g' in a real terminal
+        # should instead drop back to the prompt, not close the window.
+        if [[ -n "${BB_VIEW_SESSION:-}" ]]; then
+            exit
+        else
+            trap - EXIT HUP
+            return
+        fi
     fi
 
     # Already running?  Just attach — its windows live in the tmux server.
