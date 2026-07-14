@@ -551,7 +551,17 @@ mouse-3: Next buffer" mouse-face mode-line-highlight local-map
 (use-package server
   :ensure nil
   :config
+  ;; A hard-killed Emacs (crash, SIGKILL after a freeze) never runs its cleanup,
+  ;; so it leaves its socket FILE behind.  `server-running-p' then correctly says
+  ;; "no server" -- nothing is listening on it -- so we proceed to `server-start',
+  ;; which promptly fails to BIND that path: "Cannot bind server socket: Address
+  ;; already in use".  use-package catches it, and you're left with no server at
+  ;; all: emacsclient, ecommit, eopen and ebuffer all dead until you restart.
+  ;; Delete the corpse socket first.  The `unless' still protects a server that is
+  ;; genuinely alive in ANOTHER Emacs (`server-running-p' returns `:other' there,
+  ;; which is non-nil, so we never touch it).
   (unless (server-running-p)
+    (server-force-delete)
     (server-start)))
 
 ;; Session save/restore.  On EVERY exit (`kill-emacs-hook' — so a plain `C-x C-c'
@@ -2023,6 +2033,25 @@ more readily.")
 
 (use-package magit
   :commands (magit-status magit-dispatch)
+  :init
+  ;; Commits are prepared as a commit buffer to REVIEW, never `git commit -m'
+  ;; blind.  `my-magit-commit' runs `magit-commit-create' with "-e -F FILE", so
+  ;; git itself seeds the (editable) message from FILE -- robust, no fragile
+  ;; prefill hook, no timeout poll.  with-editor runs git as an Emacs-owned async
+  ;; process (survives the calling shell); finish C-c C-c / abort C-c C-k.  The
+  ;; `ecommit' script calls this over emacsclient with a message-file path.
+  ;;
+  ;; Deliberately in :init, NOT :config -- magit is DEFERRED (`:commands'), so
+  ;; :config does not run until you first open magit.  `ecommit' calls this over
+  ;; emacsclient on a fresh Emacs, where that hasn't happened: it failed with
+  ;; "void-function my-magit-commit".  The body `require's magit itself, so
+  ;; defining it eagerly is free and still loads magit on demand.
+  (defun my-magit-commit (msgfile &optional dir)
+    "Open an editable commit buffer for DIR's staged changes, seeded by git from
+MSGFILE (via `git commit -e -F').  Called by the `ecommit' script."
+    (require 'magit)
+    (let ((default-directory (or dir default-directory)))
+      (magit-commit-create (list "-e" "-F" (expand-file-name msgfile)))))
   :custom
   ;; No separate diff window when committing -- the commit buffer already lists
   ;; the staged files, made clickable/RET-openable by `my-git-commit-linkify-files'.
@@ -2036,19 +2065,6 @@ more readily.")
   ;; "perfect rebase mode" from any ghostel/byobu shell.
   (require 'git-commit)
   (require 'git-rebase)
-
-  ;; Commits are prepared as a commit buffer to REVIEW, never `git commit -m'
-  ;; blind.  `my-magit-commit' runs `magit-commit-create' with "-e -F FILE", so
-  ;; git itself seeds the (editable) message from FILE -- robust, no fragile
-  ;; prefill hook, no timeout poll.  with-editor runs git as an Emacs-owned async
-  ;; process (survives the calling shell); finish C-c C-c / abort C-c C-k.  The
-  ;; `ecommit' script calls this over emacsclient with a message-file path.
-  (defun my-magit-commit (msgfile &optional dir)
-    "Open an editable commit buffer for DIR's staged changes, seeded by git from
-MSGFILE (via `git commit -e -F').  Called by the `ecommit' script."
-    (require 'magit)
-    (let ((default-directory (or dir default-directory)))
-      (magit-commit-create (list "-e" "-F" (expand-file-name msgfile)))))
 
   ;; Make the staged-file lines in the commit buffer clickable + RET-openable
   ;; (dashboard-style), so you can jump to a changed file from the message.
