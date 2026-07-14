@@ -57,18 +57,23 @@
     (indent-region (point-min) (point-max) nil)
     (untabify (point-min) (point-max)))
   (defun insert-newline-before-line ()
+    "Open an indented line above the current one, leaving point on it.
+Bound to \\`C-<return>'.
+
+Was a `goto-line'-based reimplementation, which was wrong twice over:
+`line-number-at-pos' counts from the start of the ACCESSIBLE portion while
+`goto-line' takes an ABSOLUTE line number, so under narrowing it jumped somewhere
+else entirely; and `goto-line' pushes the mark, so the command clobbered your mark
+ring on every use.  Neither line numbers nor a special case for line 1 are needed
+-- just move to the start of the line and insert."
     (interactive)
-    (let ((current-line (line-number-at-pos (point))))
-      (if (eql current-line 1)
-          (progn
-            (beginning-of-line)
-            (newline-and-indent)
-            (goto-line 1)
-            (indent-according-to-mode))
-        (progn
-          (goto-line (1- current-line))
-          (end-of-line)
-          (newline-and-indent)))))
+    (move-beginning-of-line nil)
+    ;; Plain `insert', not `newline-and-indent': in modes that set
+    ;; `electric-indent-inhibit' (python-mode) the latter would re-indent the line
+    ;; we are pushing down.
+    (insert "\n")
+    (forward-line -1)
+    (indent-according-to-mode))
   (defun rename-file-and-buffer ()
     "Rename the current buffer and file it is visiting."
     (interactive)
@@ -324,12 +329,16 @@ mouse-3: Next buffer" mouse-face mode-line-highlight local-map
   :ensure nil
   :custom
   (package-selected-packages
+   ;; NB: this list is only what `package-autoremove' considers "wanted" -- what is
+   ;; actually installed is driven by :ensure on the use-package blocks below.  It
+   ;; drifts, so don't trust it as an inventory.  (lsp-mode/lsp-ui/lsp-docker lived
+   ;; here long after the config moved to eglot, and weren't even installed.)
    '(web-mode multi-web-mode 0blayout 0x0 all-the-icons bazel cargo-mode company consult
       corfu dashboard delight diff-hl diminish dired-subtree dockerfile-mode
       dotenv-mode dumb-jump eglot-fsharp elixir-mode envrc exec-path-from-shell
       fsharp-mode gcmh ghostel git-commit git-link go-mode go-noisegate grip-mode
       inheritenv
-      highlight-indentation iedit logview lsp-docker lsp-mode lsp-ui magit marginalia
+      highlight-indentation iedit logview magit marginalia
       markdown markdown-mode mini-frame orderless origami posframe projectile rg rust-mode
       transient treesit-auto undo-fu vertico yaml-mode)))
 
@@ -474,8 +483,12 @@ mouse-3: Next buffer" mouse-face mode-line-highlight local-map
 (use-package warnings
   :ensure nil
   :custom
-  (warning-suppress-log-types '((auto-save) (lsp-mode)))
-  (warning-suppress-types '((lsp-mode))))
+  ;; auto-save warnings are suppressed at the LOG level, so they never reach the
+  ;; *Warnings* buffer at all -- which is why there is no `warning-suppress-types'
+  ;; (display-only suppression) counterpart here any more.  Its sole entry was
+  ;; lsp-mode, dropped with the rest of the lsp leftovers: this config has been
+  ;; eglot-only for a long time and lsp-mode isn't even installed.
+  (warning-suppress-log-types '((auto-save))))
 
 (use-package web-mode
   :custom
@@ -2299,10 +2312,11 @@ Defensive -- a failure here must never block the commit buffer from opening."
 (use-package vc
   :ensure nil
   :config
-  (defadvice vc-mode-line (after strip-backend () activate)
+  ;; Shorten the mode-line VC indicator: " Git:master" -> "Γ:master".  (`defadvice'
+  ;; here was obsolete as of 30.1 and the byte-compiler said so on every load.)
+  (define-advice vc-mode-line (:after (&rest _) strip-backend)
     (when (stringp vc-mode)
-      (let ((gitlogo (replace-regexp-in-string "^ Git." "Γ:" vc-mode)))
-        (setq vc-mode gitlogo)))))
+      (setq vc-mode (replace-regexp-in-string "^ Git." "Γ:" vc-mode)))))
 
 (use-package rg
   :after (projectile consult)
