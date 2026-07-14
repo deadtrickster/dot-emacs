@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+# Repo smoke test.  Run before committing; also wired into CI.
+#
+# `check-parens' alone is not enough: it catches an unbalanced paren and NOTHING
+# else -- not a bad `:custom' key, not a typo'd hook, not a package that vanished
+# from MELPA.  Actually LOADING the config catches those.  And the vendored shell
+# scripts are load-bearing -- `shell/integration.bash' is sourced by every shell
+# you open, so a syntax error there bricks your terminal -- so every one of them
+# gets `bash -n' plus a ShellCheck pass.  (Do not start a comment line with the
+# linter's own name: it parses that as a directive.)
+#
+# Loading init.el headlessly is only SAFE because the config guards its
+# side-effecting hooks with `noninteractive': the installer
+# (`my-ensure-shell-integration'), the session snapshot (`my-restart--save-state'
+# on kill-emacs-hook -- a batch Emacs exits immediately and would otherwise
+# overwrite your real session with an empty one) and `server-start'.  If you add a
+# new startup/exit hook that touches $HOME, guard it the same way.
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+fail=0
+step() { printf '\n\033[1m==> %s\033[0m\n' "$1"; }
+bad() {
+    printf '    \033[31mFAIL\033[0m %s\n' "$1"
+    fail=1
+}
+
+step "elisp: parens"
+for f in early-init.el init.el; do
+    # emacs-lisp-mode matters: in fundamental-mode check-parens miscounts parens
+    # inside comments and strings, and false-fails on this file.
+    if emacs -Q --batch --eval "(with-temp-buffer
+                                   (insert-file-contents \"$f\")
+                                   (emacs-lisp-mode)
+                                   (check-parens))" 2>/dev/null; then
+        printf '    ok   %s\n' "$f"
+    else
+        bad "$f"
+    fi
+done
+
+step "elisp: full headless load"
+# -Q means Emacs never activates packages (it only does that for a real init), so
+# `package-activate-all' here is what puts elpa/ on the load-path -- without it
+# every :ensure package "cannot load" and the test is worthless.
+if emacs -Q --batch --eval '(progn
+      (setq debug-on-error t)
+      (load (expand-file-name "early-init.el") nil t)
+      (package-activate-all)
+      (load (expand-file-name "init.el") nil t)
+      (run-hooks (quote after-init-hook))
+      (message "loaded clean"))'; then
+    printf '    ok   config loads (early-init + init + after-init-hook)\n'
+else
+    bad "config does not load"
+fi
+
+step "shell: parse + lint"
+mapfile -t scripts < <(git ls-files |
+    grep -E '^(bin|shell/bin|byobu/bin|claude/hooks)/|\.bash$')
+
+for f in "${scripts[@]}"; do
+    bash -n "$f" 2>/dev/null || bad "does not parse: $f"
+done
+printf '    ok   %s scripts parse\n' "${#scripts[@]}"
+
+if command -v shellcheck >/dev/null 2>&1; then
+    if shellcheck "${scripts[@]}"; then
+        printf '    ok   shellcheck clean\n'
+    else
+        bad "shellcheck findings above"
+    fi
+else
+    printf '    --   shellcheck not installed, skipped\n'
+fi
+
+if [ "$fail" -eq 0 ]; then
+    printf '\n\033[32mall checks passed\033[0m\n'
+else
+    printf '\n\033[31mFAILED\033[0m\n' >&2
+fi
+exit "$fail"

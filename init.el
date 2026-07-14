@@ -560,7 +560,11 @@ mouse-3: Next buffer" mouse-face mode-line-highlight local-map
   ;; Delete the corpse socket first.  The `unless' still protects a server that is
   ;; genuinely alive in ANOTHER Emacs (`server-running-p' returns `:other' there,
   ;; which is non-nil, so we never touch it).
-  (unless (server-running-p)
+  ;; Never in batch: the headless smoke test loads this config, and a batch Emacs
+  ;; must not `server-force-delete' (it could remove the socket of the REAL Emacs
+  ;; you have running) nor `server-start' (it would exit and leave a stale socket
+  ;; behind -- recreating the very bug this block exists to fix).
+  (unless (or noninteractive (server-running-p))
     (server-force-delete)
     (server-start)))
 
@@ -745,10 +749,16 @@ buffers, window layout, and project terminals."
                                 (mapcar (lambda (w) (buffer-name (window-buffer w)))
                                         (window-list))))))))))
   :config
-  (add-hook 'emacs-startup-hook #'my-restart--maybe-restore)
-  ;; First half: snapshot on every exit so a plain `C-x C-c' / laptop shutdown
-  ;; comes back next launch (the startup hook restores + consumes the file).
-  (add-hook 'kill-emacs-hook #'my-restart--save-state))
+  ;; NOT in batch.  The headless smoke test (AGENTS.md) LOADS this config, and a
+  ;; batch Emacs exits immediately -- which would fire `kill-emacs-hook' and
+  ;; overwrite the real session snapshot with the batch session's (empty) state,
+  ;; destroying it.  The restore side is equally unwanted headless: it would
+  ;; reopen files and respawn project terminals.
+  (unless noninteractive
+    (add-hook 'emacs-startup-hook #'my-restart--maybe-restore)
+    ;; First half: snapshot on every exit so a plain `C-x C-c' / laptop shutdown
+    ;; comes back next launch (the startup hook restores + consumes the file).
+    (add-hook 'kill-emacs-hook #'my-restart--save-state)))
 
 ;; Monorepo self-install: this .emacs.d repo also vendors the shell + byobu
 ;; integration (shell/integration.bash, byobu/*).  Ensure, idempotently at
@@ -858,7 +868,11 @@ buffers, window layout, and project terminals."
               (error
                (message "inside-emacs setup: left settings.json alone (%S)" err)))))))))
 
-(add-hook 'after-init-hook #'my-ensure-shell-integration)
+;; Never run the installer in batch: the headless smoke test (see AGENTS.md) LOADS
+;; this config to prove it still works, and it must not write to ~/.bashrc, create
+;; symlinks, or touch ~/.claude/settings.json as a side effect of being tested.
+(unless noninteractive
+  (add-hook 'after-init-hook #'my-ensure-shell-integration))
 
 ;; Clipboard interop with X11 apps (xfce4-terminal, Chrome, ...).
 ;; `C-y' reads the CLIPBOARD selection; also fall back to the PRIMARY selection

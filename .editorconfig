@@ -11,8 +11,8 @@ switch_case_indent = true
 
 # The vendored scripts have no extension, so match them by path: shell/bin/*
 # (eopen, esay, enotify, ecommit, ebuffer, esh, etab, oriole-*), byobu/bin/*
-# (bb-save-layout), claude/hooks/* (inside-emacs-context).
-[{shell/bin,byobu/bin,claude/hooks}/*]
+# (bb-save-layout), claude/hooks/* (inside-emacs-context), bin/* (check).
+[{bin,shell/bin,byobu/bin,claude/hooks}/*]
 indent_style = space
 indent_size = 4
 switch_case_indent = true

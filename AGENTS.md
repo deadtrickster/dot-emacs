@@ -14,6 +14,7 @@ up the rest.
 | `shell/integration.bash` | Vendored shell integration: `bb`/`bb-reset`, ghostel/`emacsclient` helpers, direnv hook, git-prompt. Sourced by `~/.bashrc`. |
 | `byobu/{status,.tmux.conf,bin/bb-save-layout}` | Vendored byobu config; symlinked into `~/.config/byobu/`. |
 | `claude/{inside-emacs.md,hooks/inside-emacs-context}` | Vendored "Claude is running inside Emacs" context overlay + its `SessionStart` hook; symlinked into `~/.claude/` and registered in `~/.claude/settings.json`. |
+| `bin/check` | The test suite: elisp parens + a full headless load of the config, then `bash -n`/`shellcheck` over every vendored script. Run before committing. |
 | `AGENTS.md` / `CLAUDE.md` | This file; `CLAUDE.md` just `@`-imports it. |
 | `.gitignore` | Everything else under `~/.emacs.d` is generated (elpa, eln-cache, quelpa, tree-sitter, caches, sessions) and ignored. |
 
@@ -54,9 +55,25 @@ New features go on a clean branch on top of trunk (`master`):
   **no `custom.el`** — `custom-file` points at a throwaway temp so `M-x customize`
   never writes a tracked file. The bootstrap (require package, install
   use-package) and `early-init.el` are the only non-`use-package` top-level code.
-- **Verify before trusting.** After editing `init.el`:
-  `emacs -Q --batch --eval '(with-temp-buffer (insert-file-contents "init.el") (emacs-lisp-mode) (check-parens))'`
-  (the `(emacs-lisp-mode)` matters — without it the check runs in `fundamental-mode` and miscounts parens inside comments/strings, false-failing on this file).
+- **Verify before trusting — run `./bin/check`.** It is the whole test suite:
+  `check-parens` on both elisp files, a **full headless load** of `early-init.el` +
+  `init.el` + `after-init-hook` with `debug-on-error` (this is what catches a bad
+  `:custom` key, a typo'd hook, a package that vanished from MELPA — `check-parens`
+  catches an unbalanced paren and *nothing else*), then `bash -n` + `shellcheck`
+  over every vendored script. Run it before every commit.
+  - The headless load is only **safe** because every side-effecting startup/exit
+    hook is guarded with `noninteractive`: the installer
+    (`my-ensure-shell-integration`), the session snapshot (`my-restart--save-state`
+    on `kill-emacs-hook` — a batch Emacs exits at once and would otherwise
+    **overwrite your real session with an empty one**), and `server-start` (which
+    would delete the live Emacs's socket). **Add a hook that touches `$HOME`? Guard
+    it the same way**, or `bin/check` becomes destructive.
+  - Two footguns baked into the script, in case you run the commands by hand: the
+    `(emacs-lisp-mode)` in the `check-parens` form matters (in `fundamental-mode` it
+    miscounts parens inside comments/strings and false-fails on this file), and
+    `emacs -Q` does **not** activate packages — without an explicit
+    `(package-activate-all)` every `:ensure` package "cannot load" and the test
+    passes vacuously.
 - **Apply live; don't force restarts.** An Emacs server runs (`server-start`).
   Prefer `emacsclient -e` (or loading a temp lexical-binding `.el`) over asking the
   user to restart. Native modules (ghostel) are the exception — they need a restart.

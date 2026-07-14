@@ -21,6 +21,13 @@ fi
 # git-aware prompt: show branch + working-tree state in PS1.  Injected (bold
 # yellow, before the prompt char) into whatever PS1 ~/.bashrc already built —
 # this file is sourced last, so the stock prompt stays untouched upstream.
+# SC1091: git-sh-prompt is a distro file, not ours -- nothing to follow.
+# SC2034: the GIT_PS1_* vars look unused because their only reader is __git_ps1,
+#   which comes from the file sourced on the next line (a shell function, so it
+#   sees them as plain shell vars -- they must NOT be exported).
+# SC2016: the single quotes are the point -- `$(__git_ps1 ...)' has to stay
+#   literal in PS1 and be expanded at every prompt draw, not once, here.
+# shellcheck disable=SC1091,SC2034,SC2016
 if [ -f /usr/lib/git-core/git-sh-prompt ]; then
     . /usr/lib/git-core/git-sh-prompt
     GIT_PS1_SHOWDIRTYSTATE=1     # '*' unstaged, '+' staged
@@ -48,9 +55,16 @@ case "$PS1" in
     *'[\t]'*) ;; # already prefixed (idempotent if sourced twice)
     *) PS1='\[\e[2m\][\t]\[\e[0m\] '"$PS1" ;;
 esac
+# SC2016: literal on purpose -- `$(date)' must run when PS0 is expanded (i.e. at
+# each Enter), which is the entire mechanism; expanding it here would freeze the
+# stamp at source time.
+# shellcheck disable=SC2016
 PS0='\e[F\e[2G\e[2m$(date +%H:%M:%S)\e[0m\e[E'
 
 # Bash has no built-in "re-read your rc" signal, so give it one.
+# SC1090: the source runs when the signal fires, in the user's shell; there is no
+# static path for the linter to follow.
+# shellcheck disable=SC1090
 trap 'source ~/.bashrc' USR1
 
 # Reload every OTHER shell carrying that trap.  Never use a bare `pkill -USR1
@@ -163,6 +177,11 @@ bb() {
         # Reap the ephemeral view however this shell ends: a clean detach (F6)
         # returns from `attach' below; a buffer-kill sends SIGHUP -> the trap.
         # kill-session is a no-op if already gone.
+        # SC2064: expanding $view NOW is deliberate -- the trap must capture the
+        # view name it was armed with.  Deferring it would read whatever $view
+        # happens to be at signal time (or nothing, if the shell has torn down),
+        # and we would fail to reap the session.
+        # shellcheck disable=SC2064
         trap "tmux kill-session -t '=$view' 2>/dev/null" EXIT HUP
         tmux attach -t "=$view"                   # blocks until you detach
         tmux kill-session -t "=$view" 2>/dev/null # detached -> reap the view now
@@ -275,6 +294,10 @@ if [[ "${INSIDE_EMACS%%,*}" = 'ghostel' || "$TERM" = 'xterm-ghostty' ]]; then
 
     # Directory tracking (OSC 7).  Only needed inside tmux/byobu, passthrough-wrapped.
     if [[ -n "$TMUX" ]]; then
+        # SC1003: the trailing `\\' is an escaped backslash for printf -- it emits
+        # ESC \, the String Terminator that closes the tmux passthrough sequence.
+        # Nothing to do with quoting an apostrophe.
+        # shellcheck disable=SC1003
         __ghostel_emit() { printf '\ePtmux;\e\e]%s\a\e\\' "$1"; }
         __ghostel_osc7() { __ghostel_emit "7;file://${HOSTNAME}${PWD}"; }
         ghostel_cmd() {
