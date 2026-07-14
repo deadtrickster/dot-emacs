@@ -18,7 +18,8 @@ src="${1:-$PWD}"
 
 # No toolchain -> passthrough (harmless on a machine without the pg build).
 if ! command -v pgindent >/dev/null 2>&1 || ! command -v pg_bsd_indent >/dev/null 2>&1; then
-    cat; exit 0
+    cat
+    exit 0
 fi
 
 repo=$(git -C "$(dirname "$src")" rev-parse --show-toplevel 2>/dev/null || true)
@@ -27,13 +28,13 @@ td=()
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
-cat > "$work/orig.c"
+cat >"$work/orig.c"
 cp "$work/orig.c" "$work/in.c"
 
 # pgindent edits in.c in place (and litters .BAK here, not the repo); emit it on
 # success, the pristine input on any failure so a broken run never corrupts the
 # buffer.
-if ( cd "$work" && pgindent "${td[@]}" in.c ) >/dev/null 2>&1; then
+if (cd "$work" && pgindent "${td[@]}" in.c) >/dev/null 2>&1; then
     cat "$work/in.c"
 else
     cat "$work/orig.c"

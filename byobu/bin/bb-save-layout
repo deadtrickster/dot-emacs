@@ -12,13 +12,13 @@ save_one() {
     local session="$1"
     case "$session" in
         projectile/*) ;;
-        *) return 0 ;;   # only manage projectile sessions
+        *) return 0 ;; # only manage projectile sessions
     esac
     # De-dup (preserving order) so a momentarily-duplicated session never gets
     # persisted as twin tabs -- otherwise the next fresh `bb' recreates them and
     # the duplication compounds across reboots.
-    tmux list-windows -t "=$session" -F '#{window_name}' 2>/dev/null \
-        | awk '!seen[$0]++' > "$dir/${session//\//__}"
+    tmux list-windows -t "=$session" -F '#{window_name}' 2>/dev/null |
+        awk '!seen[$0]++' >"$dir/${session//\//__}"
 }
 
 if [[ $# -gt 0 && -n "${1:-}" ]]; then

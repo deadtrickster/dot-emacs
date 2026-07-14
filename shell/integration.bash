@@ -23,15 +23,52 @@ fi
 # this file is sourced last, so the stock prompt stays untouched upstream.
 if [ -f /usr/lib/git-core/git-sh-prompt ]; then
     . /usr/lib/git-core/git-sh-prompt
-    GIT_PS1_SHOWDIRTYSTATE=1      # '*' unstaged, '+' staged
-    GIT_PS1_SHOWSTASHSTATE=1      # '$' stashed
-    GIT_PS1_SHOWUNTRACKEDFILES=1  # '%' untracked
-    GIT_PS1_SHOWUPSTREAM=auto     # '<' '>' '=' vs upstream
+    GIT_PS1_SHOWDIRTYSTATE=1     # '*' unstaged, '+' staged
+    GIT_PS1_SHOWSTASHSTATE=1     # '$' stashed
+    GIT_PS1_SHOWUNTRACKEDFILES=1 # '%' untracked
+    GIT_PS1_SHOWUPSTREAM=auto    # '<' '>' '=' vs upstream
     case "$PS1" in
-        *__git_ps1*) ;;  # already injected (idempotent if sourced twice)
+        *__git_ps1*) ;; # already injected (idempotent if sourced twice)
         *) PS1=${PS1/'\$ '/'\[\033[01;33m\]$(__git_ps1 " (%s)")\[\033[00m\]\$ '} ;;
     esac
 fi
+
+# execution-time stamp: a dim [HH:MM:SS] prefix showing when the command actually
+# RAN, not when its prompt was drawn (`\t' in PS1 alone gives you the latter --
+# useless if you sat at the prompt a while before hitting Enter).  PS1 seeds the
+# slot with the draw time; PS0 -- expanded the instant Enter is pressed, after the
+# command is read but before it executes -- jumps back up and overwrites those 8
+# chars in place.  Scrollback then tells you when each command was executed.
+#   \e[F  start of previous line   \e[2G  column 2 (inside the brackets)
+#   \e[E  back down to the start of the output line
+# Prefixed, so the stamp is always the first visible thing -> column 2 is stable.
+# Caveat: assumes the typed command fits on one line; if it wraps, \e[F lands on
+# the wrapped line and the stamp overwrites 8 chars of the echo (cosmetic only).
+case "$PS1" in
+    *'[\t]'*) ;; # already prefixed (idempotent if sourced twice)
+    *) PS1='\[\e[2m\][\t]\[\e[0m\] '"$PS1" ;;
+esac
+PS0='\e[F\e[2G\e[2m$(date +%H:%M:%S)\e[0m\e[E'
+
+# Bash has no built-in "re-read your rc" signal, so give it one.
+trap 'source ~/.bashrc' USR1
+
+# Reload every OTHER shell carrying that trap.  Never use a bare `pkill -USR1
+# bash': SIGUSR1's default action is TERMINATE, so it would kill any bash that
+# lacks the trap -- including running bash *scripts*.  This only signals processes
+# that actually CATCH USR1 (SigCgt bit 10 = 0x200 in /proc/PID/status), so it can
+# never kill anything.
+reload-shells() {
+    local p mask n=0
+    for p in $(pgrep -x bash); do
+        [ "$p" = "$$" ] && continue
+        mask=$(awk '/^SigCgt:/{print $2}' "/proc/$p/status" 2>/dev/null) || continue
+        if [ -n "$mask" ] && ((0x$mask & 0x200)); then
+            kill -USR1 "$p" 2>/dev/null && n=$((n + 1))
+        fi
+    done
+    echo "reloaded $n shell(s)"
+}
 
 # --- byobu + Emacs/ghostel projectile integration -----------------------------
 # byobu reads its config from $BYOBU_CONFIG_DIR; the customized files there
@@ -47,7 +84,7 @@ declare -A __BB_WINDOW_CMD=(
     [git]='git status'
 )
 
-__bb_layout_file() {   # $1 = session name -> path to its saved layout file
+__bb_layout_file() { # $1 = session name -> path to its saved layout file
     local dir="${BYOBU_CONFIG_DIR:-$HOME/.config/byobu}/layouts"
     mkdir -p "$dir"
     printf '%s/%s' "$dir" "${1//\//__}"
@@ -60,7 +97,11 @@ __bb_layout_file() {   # $1 = session name -> path to its saved layout file
 bb() {
     # `bb -g [window]' opens a grouped VIEW instead of a direct attach (see below).
     local grouped=0 startwin=""
-    if [[ "$1" == "-g" ]]; then grouped=1; shift; startwin="${1:-}"; fi
+    if [[ "$1" == "-g" ]]; then
+        grouped=1
+        shift
+        startwin="${1:-}"
+    fi
 
     local rawproj="${PROJECTILE_PROJECT_NAME:-$(basename "$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || echo "$PWD")")}"
     # tmux rewrites '.' and ':' in a session name to '_'; do it ourselves so our
@@ -74,7 +115,7 @@ bb() {
     # Two plain clients on one session move in lockstep; a grouped session is the
     # tmux mechanism that decouples the active window.  Ephemeral: killed on
     # detach, so the real session and its panes are never touched.
-    if (( grouped )); then
+    if ((grouped)); then
         # Only meaningful from a fresh, non-tmux shell (tmux refuses to attach
         # inside itself) — which is exactly what the Emacs command spawns.
         if [[ -n "$TMUX" ]]; then
@@ -88,8 +129,8 @@ bb() {
         # Emacs mints the view name so it can target this view's tabs (C-t); fall
         # back to a per-shell name for manual use.  '^' is tmux-safe (unlike '.'/':').
         local view="${BB_VIEW_SESSION:-${session}^v$$}"
-        tmux has-session -t "=$view" 2>/dev/null \
-            || tmux new-session -d -t "=$session" -s "$view" || return 1
+        tmux has-session -t "=$view" 2>/dev/null ||
+            tmux new-session -d -t "=$session" -s "$view" || return 1
         # Default the view to a DIFFERENT window than the base session is showing.
         # Two grouped clients on the SAME window at different widths fight over its
         # size (window-size latest) and tear each other's redraw — that's what
@@ -100,15 +141,19 @@ bb() {
             # Collect tabs already shown by the base session AND any sibling view,
             # then land on one nobody's on — so several side-by-side views spread
             # across different tabs by themselves.
-            local -A taken=(); local sname wactive wname w
+            local -A taken=()
+            local sname wactive wname w
             while IFS='|' read -r sname wactive wname; do
                 [[ "$wactive" == 1 ]] || continue
                 [[ "$sname" == "$session" || "$sname" == "$session"^v* ]] || continue
                 taken["$wname"]=1
             done < <(tmux list-windows -a \
-                     -F '#{session_name}|#{window_active}|#{window_name}' 2>/dev/null)
+                -F '#{session_name}|#{window_active}|#{window_name}' 2>/dev/null)
             while IFS= read -r w; do
-                [[ -z "${taken[$w]:-}" ]] && { startwin="$w"; break; }
+                [[ -z "${taken[$w]:-}" ]] && {
+                    startwin="$w"
+                    break
+                }
             done < <(tmux list-windows -t "=$session" -F '#{window_name}' 2>/dev/null)
             # Every tab already on screen -> accept the base's current one.
             [[ -z "$startwin" ]] && startwin=$(tmux list-windows -t "=$session" \
@@ -119,8 +164,8 @@ bb() {
         # returns from `attach' below; a buffer-kill sends SIGHUP -> the trap.
         # kill-session is a no-op if already gone.
         trap "tmux kill-session -t '=$view' 2>/dev/null" EXIT HUP
-        tmux attach -t "=$view"                      # blocks until you detach
-        tmux kill-session -t "=$view" 2>/dev/null    # detached -> reap the view now
+        tmux attach -t "=$view"                   # blocks until you detach
+        tmux kill-session -t "=$view" 2>/dev/null # detached -> reap the view now
         # Emacs spawns us in a throwaway shell and wants F6 to close the ghostel
         # buffer (BB_VIEW_SESSION is set); a manual `bb -g' in a real terminal
         # should instead drop back to the prompt, not close the window.
@@ -140,10 +185,11 @@ bb() {
     fi
 
     # Fresh session: tab names from the saved per-project layout, else defaults.
-    local file; file="$(__bb_layout_file "$session")"
+    local file
+    file="$(__bb_layout_file "$session")"
     local -a names
     if [[ -s "$file" ]]; then
-        mapfile -t names < "$file"
+        mapfile -t names <"$file"
     else
         names=("${__BB_DEFAULT_WINDOWS[@]}")
     fi
@@ -151,17 +197,20 @@ bb() {
 
     # De-dup while preserving order, so a stale/corrupt layout file (or an old
     # duplicated session captured by bb-save-layout) can't spawn twin windows.
-    local -a uniq=(); local -A seen=(); local n
+    local -a uniq=()
+    local -A seen=()
+    local n
     for n in "${names[@]}"; do
         [[ -z "$n" || -n "${seen[$n]:-}" ]] && continue
-        seen[$n]=1; uniq+=("$n")
+        seen[$n]=1
+        uniq+=("$n")
     done
     names=("${uniq[@]}")
 
     local first=1 name cmd
     for name in "${names[@]}"; do
         [[ -z "$name" ]] && continue
-        if (( first )); then
+        if ((first)); then
             # Create through byobu-tmux so a fresh server loads byobu's profile
             # (-f ...); plain tmux would come up with the stock green status bar.
             byobu-tmux new-session -d -s "$session" -n "$name" -c "$PWD"
@@ -188,7 +237,10 @@ bb-reset() {
     read -rp "Reset '$session' to default tabs? Kills the session. [y/N] " ans
     case "$ans" in
         [yY]*) ;;
-        *) echo "aborted"; return 1 ;;
+        *)
+            echo "aborted"
+            return 1
+            ;;
     esac
     rm -f "$(__bb_layout_file "$session")"
     echo "Cleared saved layout for '$session'."
@@ -216,9 +268,9 @@ if [[ "${INSIDE_EMACS%%,*}" = 'ghostel' || "$TERM" = 'xterm-ghostty' ]]; then
 
         # Interactive shortcuts -> the vendored `eopen' script (one impl, shared
         # with Claude; `my-ensure-shell-integration' puts it on PATH).
-        e()     { eopen "$@"; }
+        e() { eopen "$@"; }
         emacs() { eopen "$@"; }
-        open()  { eopen "$@"; }
+        open() { eopen "$@"; }
     fi
 
     # Directory tracking (OSC 7).  Only needed inside tmux/byobu, passthrough-wrapped.
@@ -246,11 +298,12 @@ if [[ "${INSIDE_EMACS%%,*}" = 'ghostel' || "$TERM" = 'xterm-ghostty' ]]; then
         # -c/-r, so windows never cross-contaminate) so an abrupt shutdown keeps
         # it.  Outside tmux the shell keeps stock ~/.bash_history.
         __bb_hist_key=$(tmux display-message -p '#{session_name}__#{window_name}' \
-                        2>/dev/null | tr -d '\n' | tr -c 'A-Za-z0-9_.-' '_')
+            2>/dev/null | tr -d '\n' | tr -c 'A-Za-z0-9_.-' '_')
         if [[ -n "$__bb_hist_key" ]]; then
             mkdir -p "$HOME/.bash_history.d"
             HISTFILE="$HOME/.bash_history.d/$__bb_hist_key"
-            history -c; history -r 2>/dev/null   # this window's history, not the shared one
+            history -c
+            history -r 2>/dev/null # this window's history, not the shared one
             case ";${PROMPT_COMMAND};" in
                 *";history -a;"*) ;;
                 *) PROMPT_COMMAND="history -a;${PROMPT_COMMAND}" ;;

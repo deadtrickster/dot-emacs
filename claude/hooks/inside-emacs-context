@@ -6,7 +6,7 @@
 # Interim home: ~/.claude.  Migrates into the ~/.claude-mind store later
 # (see ~/.emacs.d/docs/context-overlays.md, overlay #4).
 case "$INSIDE_EMACS" in
-    *ghostel*|*emacs*) ;;
+    *ghostel* | *emacs*) ;;
     *) exit 0 ;;
 esac
 ctx="$HOME/.claude/context/_env/inside-emacs.md"

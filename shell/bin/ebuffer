@@ -12,9 +12,10 @@
 # Allowlist: Bash(ebuffer:*)
 set -euo pipefail
 case "${1:-}" in
-  "") ref="(my-ebuffer-ref)" ;;
-  *)  ref="(my-ebuffer-ref \"$1\")" ;;
+    "") ref="(my-ebuffer-ref)" ;;
+    *) ref="(my-ebuffer-ref \"$1\")" ;;
 esac
-path=$(emacsclient -e "$ref")          # emacsclient prints the elisp string, quoted
-path=${path%\"}; path=${path#\"}       # strip the surrounding quotes
+path=$(emacsclient -e "$ref") # emacsclient prints the elisp string, quoted
+path=${path%\"}
+path=${path#\"} # strip the surrounding quotes
 printf '%s\n' "$path"

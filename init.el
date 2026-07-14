@@ -1860,6 +1860,12 @@ just gets a `<2>' suffix).  This is what makes save/restore match reliably."
   ;; Use ruff (installed) for Python instead of the default black.
   (setf (alist-get 'python-ts-mode apheleia-mode-alist) '(ruff-isort ruff)
         (alist-get 'python-mode    apheleia-mode-alist) '(ruff-isort ruff))
+  ;; shfmt for shell scripts -- gofmt-for-shell.  apheleia already maps
+  ;; `bash-ts-mode'; add plain `sh-mode', which is what the extensionless helper
+  ;; scripts (esh, etab, oriole-pgindent, ...) open in.  apheleia passes shfmt NO
+  ;; style flags on purpose: style comes from `.editorconfig' (4-space indent,
+  ;; indented `case' branches -- see this repo's .editorconfig).
+  (add-to-list 'apheleia-mode-alist '(sh-mode . shfmt))
   ;; No format-on-save for C/C++: clang-format ignores Emacs's indent vars and
   ;; reformats aggressively, fighting the 4-space editor indent.  Add a project
   ;; .clang-format if you want full formatting there.
@@ -2193,3 +2199,13 @@ Defensive -- a failure here must never block the commit buffer from opening."
 ;; Minibuffer UI is handled by `mini-frame' above.  The old config also pulled
 ;; in minad/mini-popup via quelpa, but it overlaps with mini-frame and required
 ;; a fragile GitHub fetch at startup, so it was dropped during the migration.
+
+;; ---- Oracle: gptel -> local Ollama (see ~/Projects/oracle/PLAN.md Step 5) ----
+;; M-x gptel (chat) or select code + M-x gptel-send.
+;; No RAG here -- use RAGFlow (http://localhost) when you need doc-grounded answers.
+(use-package gptel
+  :config
+  (setq gptel-model 'qwen3-coder:30b
+        gptel-backend (gptel-make-ollama "Ollama"
+                        :host "localhost:11434" :stream t
+                        :models '(qwen3-coder:30b codestral))))

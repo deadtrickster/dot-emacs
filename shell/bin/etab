@@ -23,36 +23,54 @@
 set -euo pipefail
 
 win="${1:-}"
-[ -n "$win" ] || { echo "usage: etab <window> \"text\" | etab <window> -F <file>" >&2; exit 2; }
+[ -n "$win" ] || {
+    echo "usage: etab <window> \"text\" | etab <window> -F <file>" >&2
+    exit 2
+}
 shift
 
 # --- gather the text ---------------------------------------------------------
 if [ "${1:-}" = "-F" ]; then
-  file="${2:?usage: etab <window> -F <file>}"
-  [ -r "$file" ] || { echo "etab: cannot read $file" >&2; exit 1; }
-  text=$(cat -- "$file")
+    file="${2:?usage: etab <window> -F <file>}"
+    [ -r "$file" ] || {
+        echo "etab: cannot read $file" >&2
+        exit 1
+    }
+    text=$(cat -- "$file")
 else
-  text="$*"
+    text="$*"
 fi
-[ -n "$text" ] || { echo "etab: nothing to stage" >&2; exit 2; }
+[ -n "$text" ] || {
+    echo "etab: nothing to stage" >&2
+    exit 2
+}
 
 # --- resolve the target session/window --------------------------------------
 sess=$(tmux display-message -p '#S' 2>/dev/null || true)
-if [ -z "$sess" ]; then          # not inside tmux -> derive like `bb'
-  raw="${PROJECTILE_PROJECT_NAME:-$(basename "$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || echo "$PWD")")}"
-  sess="projectile/${raw//[.: ]/_}"
+if [ -z "$sess" ]; then # not inside tmux -> derive like `bb'
+    raw="${PROJECTILE_PROJECT_NAME:-$(basename "$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || echo "$PWD")")}"
+    sess="projectile/${raw//[.: ]/_}"
 fi
-tmux has-session -t "=$sess" 2>/dev/null \
-  || { echo "etab: no byobu session '$sess'" >&2; exit 1; }
-tmux list-windows -t "=$sess" -F '#{window_name}' 2>/dev/null | grep -qxF -- "$win" \
-  || { echo "etab: no '$win' window in $sess (open it first)" >&2; exit 1; }
+tmux has-session -t "=$sess" 2>/dev/null ||
+    {
+        echo "etab: no byobu session '$sess'" >&2
+        exit 1
+    }
+tmux list-windows -t "=$sess" -F '#{window_name}' 2>/dev/null | grep -qxF -- "$win" ||
+    {
+        echo "etab: no '$win' window in $sess (open it first)" >&2
+        exit 1
+    }
 
 # --- sanitize: no way to execute itself -------------------------------------
 # Drop every control byte except tab (\011) and newline (\012): NUL..BS,
 # VT..US (covers CR \015 and ESC \033), and DEL.  `$(...)' also strips a
 # trailing newline.  Internal newlines survive as literal line breaks.
 clean=$(printf '%s' "$text" | LC_ALL=C tr -d '\000-\010\013-\037\177')
-[ -n "$clean" ] || { echo "etab: nothing left to stage after sanitization" >&2; exit 2; }
+[ -n "$clean" ] || {
+    echo "etab: nothing left to stage after sanitization" >&2
+    exit 2
+}
 
 # --- paste (bracketed, no Enter) --------------------------------------------
 buf="etab-$$"

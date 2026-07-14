@@ -11,7 +11,9 @@
 # Allowlist: Bash(ecommit:*)
 set -euo pipefail
 msgfile="$(git rev-parse --absolute-git-dir)/ECOMMIT_MSG"
-if   [ "${1:-}" = "-F" ]; then cat -- "$2"        > "$msgfile"
-elif [ "$#" -gt 0 ];      then printf '%s\n' "$*" > "$msgfile"
-else                          cat                 > "$msgfile"; fi
+if [ "${1:-}" = "-F" ]; then
+    cat -- "$2" >"$msgfile"
+elif [ "$#" -gt 0 ]; then
+    printf '%s\n' "$*" >"$msgfile"
+else cat >"$msgfile"; fi
 exec emacsclient -e "(my-magit-commit \"$msgfile\" \"$PWD\")" >/dev/null

@@ -1,0 +1,18 @@
+# Shell style for this repo, for BOTH the editor and shfmt.  apheleia runs shfmt
+# with no style flags on purpose -- shfmt reads EditorConfig (via -filename), so
+# this file is the single source of truth.  Matches the existing scripts: 4-space
+# indent, and `case' branches indented one level under the `case'.
+root = true
+
+[*.{sh,bash}]
+indent_style = space
+indent_size = 4
+switch_case_indent = true
+
+# The vendored scripts have no extension, so match them by path: shell/bin/*
+# (eopen, esay, enotify, ecommit, ebuffer, esh, etab, oriole-*), byobu/bin/*
+# (bb-save-layout), claude/hooks/* (inside-emacs-context).
+[{shell/bin,byobu/bin,claude/hooks}/*]
+indent_style = space
+indent_size = 4
+switch_case_indent = true
