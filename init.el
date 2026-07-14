@@ -1634,6 +1634,20 @@ it.  Guarded on the notice being set, so it's a cheap no-op the rest of the time
   (projectile-git-submodule-command "")
   :config
   (global-set-key (kbd "C-t") my-ghostel-prefix-map)
+
+  ;; ...but a major mode's own map beats the global one, and `dired-mode-map' binds
+  ;; C-t as the image-dired prefix (C-t d thumbnails, C-t t tag, ...).  Emacs
+  ;; composes the two with image-dired's FIRST, so from dired every key image-dired
+  ;; defines shadows ours: `C-t C-t' toggled marked thumbnails instead of jumping to
+  ;; the terminal, and the letters it claims (d a e f c i j r t x .) swallowed the
+  ;; type-to-filter window switch -- `C-t t' for the *test* tab among them.  Take the
+  ;; prefix over in dired, and move image-dired's out to `C-c t' rather than dropping
+  ;; it on the floor.
+  (with-eval-after-load 'dired
+    (let ((image-dired-map (lookup-key dired-mode-map (kbd "C-t"))))
+      (when (keymapp image-dired-map)
+        (define-key dired-mode-map (kbd "C-c t") image-dired-map)))
+    (define-key dired-mode-map (kbd "C-t") my-ghostel-prefix-map))
   (define-key projectile-mode-map (kbd "s-p") 'projectile-command-map)
   (define-key projectile-mode-map (kbd "C-c p") 'projectile-command-map)
   (projectile-mode +1)
