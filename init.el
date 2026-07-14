@@ -294,6 +294,230 @@ mouse-3: Next buffer" mouse-face mode-line-highlight local-map
   :custom
   (dired-kill-when-opening-new-dired-buffer t))
 
+;; Git status in dired, in git's own two columns.
+;;
+;; Deliberately NOT `diff-hl-dired-mode' (which we could have had for one line,
+;; diff-hl already being installed): it goes through VC's generic `dir-status-files',
+;; and the git backend collapses staged and unstaged into a single `edited' state --
+;; so a file you have staged and a file you have not look identical.  That is the one
+;; distinction worth having.  `git status --porcelain' reports it natively as XY:
+;; X = the index (staged), Y = the worktree (unstaged).  So read that instead.
+;;
+;;   M_  staged            _M  unstaged         MM  staged, then edited again
+;;   A_  new, staged       ??  untracked        !!  ignored        UU  conflict
+;;
+;; Rendered as an overlay just left of the filename -- no buffer text is touched, so
+;; dired's own parsing, marks and `dired-subtree' are unaffected, and a revert (`g')
+;; recomputes everything.  One `git status' per listing.
+(use-package emacs
+  :ensure nil
+  :init
+  (defvar my-dired-git-show-ignored t
+    "Whether the dired git column marks ignored files (`!!').")
+
+  ;; Don't invent colours -- ASK GIT.  `git config --get-color' returns the exact
+  ;; SGR escape git would print for a slot, honouring the user's `color.status.*'
+  ;; (and git's own defaults when unset: added=green, changed/untracked=red).  We
+  ;; translate that escape through Emacs's `ansi-color-*' faces, which ARE the
+  ;; terminal palette -- so the column matches what `git status' looks like in the
+  ;; byobu tab next door, down to the shade (ansi red is red3, not the red1 an
+  ;; eyeballed face would pick), and it keeps matching if the git config changes.
+  (defconst my-dired-git--ansi-faces
+    '((30 . ansi-color-black)   (31 . ansi-color-red)
+      (32 . ansi-color-green)   (33 . ansi-color-yellow)
+      (34 . ansi-color-blue)    (35 . ansi-color-magenta)
+      (36 . ansi-color-cyan)    (37 . ansi-color-white)
+      (90 . ansi-color-bright-black)   (91 . ansi-color-bright-red)
+      (92 . ansi-color-bright-green)   (93 . ansi-color-bright-yellow)
+      (94 . ansi-color-bright-blue)    (95 . ansi-color-bright-magenta)
+      (96 . ansi-color-bright-cyan)    (97 . ansi-color-bright-white))
+    "SGR foreground code -> the Emacs face carrying that terminal colour.")
+
+  (defvar my-dired-git--faces nil
+    "Cache of slot -> face plist, as answered by `git config --get-color'.
+Reset with \\[my-dired-git-refresh-faces] after changing your git colour config.")
+
+  (defun my-dired-git--face (slot default)
+    "The face plist git would use for SLOT (a `color.status.<slot>' name)."
+    (require 'ansi-color)
+    (or (cdr (assoc slot my-dired-git--faces))
+        (let ((escape (with-temp-buffer
+                        (when (eq 0 (ignore-errors
+                                      (process-file "git" nil t nil "config" "--get-color"
+                                                    (concat "color.status." slot)
+                                                    default)))
+                          (buffer-string))))
+              (spec nil))
+          (dolist (code (and escape
+                             (split-string
+                              (string-trim (or (car (split-string escape "m" t)) "")
+                                           "\e\\[")
+                              ";" t)))
+            (let* ((n (string-to-number code))
+                   (face (cdr (assq n my-dired-git--ansi-faces))))
+              (cond
+               (face (setq spec (plist-put spec :foreground
+                                           (face-foreground face nil t))))
+               ;; 40-47 are the same colours, as a background.
+               ((and (>= n 40) (<= n 47))
+                (when-let* ((bg (cdr (assq (- n 10) my-dired-git--ansi-faces))))
+                  (setq spec (plist-put spec :background (face-foreground bg nil t)))))
+               ((= n 1) (setq spec (plist-put spec :weight 'bold)))
+               ((= n 2) (setq spec (plist-put spec :weight 'light)))
+               ((= n 4) (setq spec (plist-put spec :underline t))))))
+          (push (cons slot spec) my-dired-git--faces)
+          spec)))
+
+  (defun my-dired-git-refresh-faces ()
+    "Re-read the git colour config (after editing `color.status.*')."
+    (interactive)
+    (setq my-dired-git--faces nil))
+
+  (defvar-local my-dired-git--overlays nil
+    "Overlays this buffer's git column is made of, so a refresh can clear them.")
+
+  (defvar-local my-dired-git--proc nil
+    "In-flight `git status' for this dired buffer, so a revert can cancel it.")
+
+  (defun my-dired-git--merge (a b)
+    "Merge two XY status codes for a directory rollup.
+Same char wins, a space loses to a real one, and genuinely different states
+collapse to `*' -- \"something in here, more than one kind of something\"."
+    (if (null a)
+        b
+      (mapconcat (lambda (i)
+                   (let ((x (aref a i)) (y (aref b i)))
+                     (cond ((eq x y) (string x))
+                           ((eq x ?\s) (string y))
+                           ((eq y ?\s) (string x))
+                           (t "*"))))
+                 '(0 1) "")))
+
+  (defun my-dired-git--parse (output root)
+    "Parse porcelain-v1 -z OUTPUT into a map of absolute path -> XY code.
+Directories get the merged state of everything beneath them, so a collapsed subdir
+still tells you there is something in there."
+    (let ((table (make-hash-table :test 'equal))
+          (fields (split-string output "\0" t)))
+      (while fields
+        (let* ((field (pop fields))
+               (xy (substring field 0 2))
+               ;; porcelain v1 is "XY PATH"; paths are repo-root-relative.
+               (path (expand-file-name (directory-file-name (substring field 3))
+                                       root)))
+          ;; A rename/copy is followed by its ORIGINAL path as its own NUL field.
+          ;; Drop it, or it gets parsed as the next status entry.
+          (when (memq (aref xy 0) '(?R ?C))
+            (pop fields))
+          (puthash path xy table)
+          ;; Roll the state up into every parent directory, stopping at root.
+          (let ((parent (file-name-directory path))
+                (stop (file-name-as-directory (expand-file-name root))))
+            (while (and parent (string-prefix-p stop parent)
+                        (not (equal parent stop)))
+              (let ((dir (directory-file-name parent)))
+                (puthash dir (my-dired-git--merge (gethash dir table) xy) table)
+                (setq parent (file-name-directory dir)))))))
+      table))
+
+  (defun my-dired-git--render (xy)
+    "Propertize the XY code for display, or return blanks to keep columns aligned."
+    (let ((s (concat xy " ")))
+      (cond
+       ;; git prints both chars of ?? in one colour, so we do too.
+       ((equal xy "??") (propertize s 'face (my-dired-git--face "untracked" "red")))
+       ;; ...but NOT `!!'.  git paints ignored the same red as unstaged changes, and
+       ;; in ~/.emacs.d (elpa, eln-cache, session files -- nearly everything) that is
+       ;; a carpet of alarm-red over files you have already decided not to care about.
+       ;; Red carries meaning here ("not staged"); spending it on "ignored, as
+       ;; intended" devalues it.
+       ;;
+       ;; It needs an EXPLICIT quiet face, though -- leaving it unpropertized is not
+       ;; "no colour", it inherits the dired LINE's face, and dired paints directories
+       ;; in bold `dired-directory' blue.  That lit every ignored folder up instead of
+       ;; playing it down.  `shadow' overrides the line face and recedes.
+       ((equal xy "!!") (propertize s 'face 'shadow))
+       ((string-match-p "U" xy) (propertize s 'face (my-dired-git--face "unmerged" "red")))
+       (t
+        ;; The whole point: colour the two columns SEPARATELY, exactly as `git status
+        ;; --short' does -- so "MM" reads at a glance as green-then-red: staged, and
+        ;; then modified AGAIN since.  Green/red here is git's index-vs-worktree
+        ;; convention ("Changes to be committed" vs "Changes not staged"), not a
+        ;; good/bad signal: a red M means "not staged yet", not "error".
+        (concat (propertize (substring xy 0 1) 'face (my-dired-git--face "added" "green"))
+                (propertize (substring xy 1 2) 'face (my-dired-git--face "changed" "red"))
+                " ")))))
+
+  (defun my-dired-git--draw (table)
+    "Hang the XY overlays off every file line in the current dired buffer."
+    (mapc #'delete-overlay my-dired-git--overlays)
+    (setq my-dired-git--overlays nil)
+    (save-excursion
+      (goto-char (point-min))
+      (while (not (eobp))
+        (when-let* ((file (dired-get-filename nil t))
+                    (base (file-name-nondirectory file))
+                    ((not (member base '("." ".."))))
+                    (pos (dired-move-to-filename)))
+          (let ((ov (make-overlay pos pos))
+                (xy (gethash (directory-file-name (expand-file-name file)) table)))
+            ;; Clean files get three spaces rather than nothing, so the filename
+            ;; column sits in the same place whether or not a file has any status.
+            ;; NB: no `evaporate' -- these overlays are empty by construction (a
+            ;; pure `before-string' marker), and an evaporating overlay is deleted
+            ;; the instant it is empty, which silently removed all of them.
+            (overlay-put ov 'before-string
+                         (if xy (my-dired-git--render xy) "   "))
+            (push ov my-dired-git--overlays)))
+        (forward-line 1))))
+
+  (defun my-dired-git-annotate ()
+    "Annotate this dired listing with `git status', ASYNCHRONOUSLY.
+
+Async is not a nicety here.  `git status' on the 51-submodule serenedb takes ~0.85s
+-- git has to walk every submodule to decide if it is dirty -- and dired reverts on
+every `g', every file operation, and every window switch back.  Running that inline
+on `dired-after-readin-hook' would stall redisplay for the better part of a second
+each time.  So the listing draws immediately and the column lands a moment later."
+    (when (derived-mode-p 'dired-mode)
+      ;; A revert supersedes an in-flight query: drop it, or a slow answer for the
+      ;; old listing arrives late and paints stale state over the new one.
+      (when (process-live-p my-dired-git--proc)
+        (delete-process my-dired-git--proc))
+      (when-let* ((root (locate-dominating-file default-directory ".git"))
+                  (dired-buf (current-buffer))
+                  (out (generate-new-buffer " *dired-git-status*" t)))
+        (setq my-dired-git--proc
+              (ignore-errors
+                (make-process
+                 :name "dired-git-status"
+                 :buffer out
+                 :noquery t
+                 :connection-type 'pipe
+                 :command (append
+                           '("git" "status" "--porcelain" "-z")
+                           (if my-dired-git-show-ignored
+                               ;; `traditional' collapses a wholly-ignored directory
+                               ;; to ONE entry -- never enumerate elpa/, or a
+                               ;; 12k-file build/, just to draw a column.
+                               '("--ignored=traditional")
+                             '("--ignored=no")))
+                 :sentinel
+                 (lambda (proc _event)
+                   (unless (process-live-p proc)
+                     (let ((output (with-current-buffer out (buffer-string))))
+                       (kill-buffer out)
+                       (when (and (buffer-live-p dired-buf)
+                                  (eq (process-exit-status proc) 0))
+                         (with-current-buffer dired-buf
+                           (with-silent-modifications
+                             (my-dired-git--draw
+                              (my-dired-git--parse output root)))))))))))
+        ;; make-process failed (no git on PATH): don't leak the output buffer.
+        (unless my-dired-git--proc
+          (kill-buffer out)))))
+  :hook (dired-after-readin . my-dired-git-annotate))
+
 (use-package display-line-numbers
   :ensure nil
   :custom
