@@ -568,6 +568,75 @@ mouse-3: Next buffer" mouse-face mode-line-highlight local-map
     (server-force-delete)
     (server-start)))
 
+;; `emacsclient foo.c:123:4' -> open foo.c and go to 123:4.
+;;
+;; Everything in a byobu tab speaks `path:line:col': rg, grep, gcc, a Python
+;; traceback, a Claude code reference.  With $EDITOR=emacsclient the natural move
+;; is to paste one straight back -- and stock Emacs then creates a NEW, empty file
+;; literally named `foo.c:123:4'.  (emacsclient does have +LINE:COL, but that is
+;; not the shape the tools print, and you'd have to hand-edit every paste.)
+;;
+;; server.el already knows how to jump: it threads a (LINE . COLUMN) cons through
+;; `server-visit-files' as the cdr of each (FILENAME . FILEPOS) pair.  So we don't
+;; need to reimplement anything -- just rewrite the args on the way in.
+(use-package server
+  :ensure nil
+  :config
+  (defun my-server--split-file-line-col (file)
+    "Rewrite (\"foo.c:12:3\" . nil) into (\"foo.c\" . (12 . 3)) for `server-visit-files'.
+Only when the literal name does NOT exist on disk but the stripped one does, so a
+file honestly named with a colon still opens as itself."
+    (pcase-let ((`(,name . ,pos) file))
+      (if (and (stringp name)
+               (null pos)
+               (not (file-exists-p name))
+               ;; path:LINE, path:LINE:COL, and the trailing colon rg/grep print.
+               (string-match "\\`\\(.+?\\):\\([0-9]+\\)\\(?::\\([0-9]+\\)\\)?:?\\'" name)
+               (file-exists-p (match-string 1 name)))
+          (cons (match-string 1 name)
+                ;; `server-goto-line-column' treats column 0 as "don't move", and
+                ;; otherwise takes a 1-based column -- exactly what tools print.
+                (cons (string-to-number (match-string 2 name))
+                      (if (match-string 3 name)
+                          (string-to-number (match-string 3 name))
+                        0)))
+        file)))
+
+  (define-advice server-visit-files (:filter-args (args) my-file-line-col)
+    "Teach `emacsclient' the `path:line:col' shape every CLI tool prints."
+    (cons (mapcar #'my-server--split-file-line-col (car args)) (cdr args))))
+
+;; The other half of the loop above: PRODUCE a `path:line:col' for where you are.
+;; That string is the unit of exchange with everything outside Emacs -- paste it
+;; into a Claude prompt, an `rg' follow-up, `git blame -L', a bug report.  Bound on
+;; the C-t map next to the other hand-it-to-the-terminal commands (C-t C-y cites a
+;; region, C-t C-b cites a buffer), so: C-t C-w.
+(use-package emacs
+  :ensure nil
+  :init
+  (defun my-copy-file-path-with-line (&optional absolute)
+    "Copy `path:line:col' for point to the kill ring.
+Relative to the project root when the file is inside one -- that is the form you
+paste into a prompt or a review.  With a prefix arg, copy the ABSOLUTE path
+instead (what you want for `emacsclient' from an unrelated directory; either form
+is understood on the way back in, see `server-visit-files')."
+    (interactive "P")
+    (let* ((file (or buffer-file-name
+                     (user-error "This buffer is not visiting a file")))
+           (root (and (not absolute)
+                      (fboundp 'projectile-project-root)
+                      (ignore-errors (projectile-project-root))))
+           (path (if (and root (string-prefix-p (expand-file-name root)
+                                                (expand-file-name file)))
+                     (file-relative-name file root)
+                   file))
+           (ref (format "%s:%d:%d" path
+                        (line-number-at-pos nil t)
+                        (1+ (current-column)))))
+      (kill-new ref)
+      (message "Copied: %s" ref)
+      ref)))
+
 ;; Session save/restore.  On EVERY exit (`kill-emacs-hook' — so a plain `C-x C-c'
 ;; or a laptop shutdown counts) we stash an explicit snapshot (file list +
 ;; `window-state' + frame geometry + terminal project roots); on the next launch
@@ -1532,6 +1601,7 @@ it.  Guarded on the notice being set, so it's a cheap no-op the rest of the time
       (define-key map (kbd "C-y") #'my-send-region-to-claude) ; cite region to claude
       (define-key map (kbd "C-f") #'my-ghostel-open-referenced-file) ; open file Claude referenced
       (define-key map (kbd "C-b") #'my-cite-buffer-to-claude)        ; reference a buffer to claude
+      (define-key map (kbd "C-w") #'my-copy-file-path-with-line)     ; kill `path:line:col' at point
       ;; Any other key (a plain letter) -> type-to-filter window switch, seeded
       ;; with that key: C-t t -> test, C-t <type a name> -> that window.  So the
       ;; mnemonic chords are kept AND every window (incl. test/custom) is one
@@ -1763,6 +1833,18 @@ just gets a `<2>' suffix).  This is what makes save/restore match reliably."
   ;; on-type formatting with `\n' as a trigger, so pressing RET reformats the
   ;; line you just finished -- e.g. collapsing tab-aligned struct columns.
   (eglot-ignored-server-capabilities '(:documentOnTypeFormattingProvider))
+  ;; Stop logging the LSP wire protocol.  By default eglot pretty-prints EVERY
+  ;; JSON-RPC message into a 2000-event ring buffer, PER SERVER -- with clangd on
+  ;; OrioleDB/Postgres that is continuous consing and GC pressure for a buffer
+  ;; nobody reads.  `:size 0' turns it off; set it back to e.g. 2000 when actually
+  ;; debugging a server.
+  (eglot-events-buffer-config '(:size 0 :format short))
+  ;; Don't leave a clangd (or pyright, or ...) running with no buffers to serve.
+  (eglot-autoshutdown t)
+  ;; Batch keystrokes before telling the server about them: the default (0.5s in
+  ;; recent eglot, but it has changed) is what we want explicitly -- no didChange
+  ;; storm per keypress on a big C file.
+  (eglot-send-changes-idle-time 0.5)
   :hook
   ((elixir-mode elixir-ts-mode heex-ts-mode) . eglot-ensure)
   (erlang-mode . eglot-ensure)
@@ -1970,7 +2052,60 @@ more readily.")
 (use-package gcmh
   :diminish gcmh-mode
   :config
+  ;; The startup GC threshold is raised in early-init.el (with a fail-safe there
+  ;; in case this package ever fails to load); from here on gcmh owns it.
   (gcmh-mode 1))
+
+;; Don't wedge on a long-lines file.  A minified blob, a generated header, one
+;; 200k-character line in a log -- Emacs's regexp-based font-lock and bidi are
+;; superlinear in line length, and a single such line can hang the whole editor
+;; with C-g unable to help.  `so-long' detects it and defangs the expensive modes.
+(use-package so-long
+  :ensure nil
+  :custom
+  ;; A "long line" here is 400+ chars; only look at the first 100 lines to decide.
+  (so-long-threshold 400)
+  (so-long-max-lines 100)
+  ;; `so-long-minor-mode' over the default `so-long-mode': it keeps the buffer
+  ;; USABLE (major mode, and thus font-lock and treesit, stay) and just disables
+  ;; the modes that actually cost you, instead of dumping you into fundamental-mode.
+  (so-long-action 'so-long-minor-mode)
+  :config
+  (global-so-long-mode 1))
+
+;; The other half of the same problem: a file that is huge in BYTES rather than in
+;; line length.  eglot + treesit + font-lock on a 20MB file is a multi-second
+;; freeze on visit, and you almost never want any of them there -- you want to
+;; look at it.  fundamental-mode is that.
+(use-package emacs
+  :ensure nil
+  :init
+  (defvar my-large-file-threshold (* 10 1024 1024)
+    "Visit files bigger than this in `fundamental-mode', without the heavy modes.")
+
+  (defun my-large-file-guard ()
+    "Drop to `fundamental-mode' on very large files, so visiting one can't hang Emacs."
+    (when-let* ((file (buffer-file-name))
+                (size (file-attribute-size (file-attributes file)))
+                ((> size my-large-file-threshold)))
+      (fundamental-mode)
+      (setq buffer-read-only t
+            bidi-display-reordering nil)
+      (message "%s is %.1fMB -- opened read-only in fundamental-mode (%s to override)"
+               (file-name-nondirectory file)
+               (/ size 1024.0 1024.0)
+               (substitute-command-keys "\\[read-only-mode]"))))
+  :hook (find-file . my-large-file-guard))
+
+;; `ffap' and several completion backends will try to resolve any buffer token
+;; that LOOKS like a hostname (`foo.bar', i.e. most qualified symbol names and
+;; filenames) by actually asking the network -- a blocking DNS lookup / ping, on a
+;; keystroke.  On a slow or captive network that is a multi-second hang for
+;; nothing.  Never treat a token as a machine name.
+(use-package ffap
+  :ensure nil
+  :custom
+  (ffap-machine-p-known 'reject))
 
 (use-package go-mode
   :config
