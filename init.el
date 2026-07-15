@@ -1243,7 +1243,15 @@ buffers, window layout, and project terminals."
   :ensure nil
   :custom
   (select-enable-primary t)
-  (select-enable-clipboard t))
+  (select-enable-clipboard t)
+  ;; Don't let an ACTIVE REGION overwrite the PRIMARY selection.  Otherwise the
+  ;; replace-with-yank workflow breaks: `C-w' a string, mouse-select the target to
+  ;; replace, `C-y' -- and yank reads the just-set PRIMARY (the target) instead of
+  ;; the CLIPBOARD (your C-w), so with `delete-selection-mode' the selection is
+  ;; deleted and pasted back over itself: nothing changes.  This only stops Emacs
+  ;; WRITING its own selections to PRIMARY; `select-enable-primary' stays on, so
+  ;; yanking ANOTHER app's mouse-selection into Emacs still works.
+  (select-active-regions nil))
 
 ;; direnv integration: each buffer picks up the environment from its project's
 ;; .envrc, so eglot, `compile', and shell commands run with that project's tools
