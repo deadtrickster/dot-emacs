@@ -61,11 +61,26 @@ esac
 # shellcheck disable=SC2016
 PS0='\e[F\e[2G\e[2m$(date +%H:%M:%S)\e[0m\e[E'
 
-# Bash has no built-in "re-read your rc" signal, so give it one.
-# SC1090: the source runs when the signal fires, in the user's shell; there is no
-# static path for the linter to follow.
-# shellcheck disable=SC1090
-trap 'source ~/.bashrc' USR1
+# Bash has no built-in "re-read your rc" signal, so give it one -- SIGUSR1.  The
+# handler must do the MINIMUM, though: SIGUSR1 can fire while readline is active
+# (you're at the prompt), and sourcing ~/.bashrc there re-runs `history -c' /
+# `history -r' -- which frees the history list readline is holding a pointer into
+# -- and forks a subprocess.  That reentrant history surgery mid-keystroke
+# SEGFAULTS bash (it took ghostel down once).  So the trap only raises a flag; the
+# real re-source happens at the next prompt, where readline is idle and history
+# manipulation is safe.
+_bb_reload_pending=
+trap '_bb_reload_pending=1' USR1
+_bb_reload_if_pending() {
+    [ -n "$_bb_reload_pending" ] || return 0
+    _bb_reload_pending=
+    # shellcheck disable=SC1090  # dynamic re-source; no static path to follow
+    source ~/.bashrc
+}
+case ";${PROMPT_COMMAND};" in
+    *";_bb_reload_if_pending;"*) ;; # already registered (idempotent if re-sourced)
+    *) PROMPT_COMMAND="_bb_reload_if_pending;${PROMPT_COMMAND}" ;;
+esac
 
 # Reload every OTHER shell carrying that trap.  Never use a bare `pkill -USR1
 # bash': SIGUSR1's default action is TERMINATE, so it would kill any bash that
