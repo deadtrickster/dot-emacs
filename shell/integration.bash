@@ -320,7 +320,13 @@ if [[ "${INSIDE_EMACS%%,*}" = 'ghostel' || "$TERM" = 'xterm-ghostty' ]]; then
         # (not the shared file) and appended on every prompt (`history -a', no
         # -c/-r, so windows never cross-contaminate) so an abrupt shutdown keeps
         # it.  Outside tmux the shell keeps stock ~/.bash_history.
-        __bb_hist_key=$(tmux display-message -p '#{session_name}__#{window_name}' \
+        # Target THIS shell's own pane ($TMUX_PANE), not a bare `display-message':
+        # without -t, tmux reports the CLIENT's ACTIVE window, not the window this
+        # shell runs in.  During `bb''s rapid window creation the shells all source
+        # this rc while one window (claude) is active, so every one of them would key
+        # its history to `__claude' and cross-contaminate.  -t "$TMUX_PANE" pins it
+        # to the pane's own window regardless of what's focused.
+        __bb_hist_key=$(tmux display-message -t "$TMUX_PANE" -p '#{session_name}__#{window_name}' \
             2>/dev/null | tr -d '\n' | tr -c 'A-Za-z0-9_.-' '_')
         if [[ -n "$__bb_hist_key" ]]; then
             mkdir -p "$HOME/.bash_history.d"
