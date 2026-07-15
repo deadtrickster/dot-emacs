@@ -69,12 +69,17 @@ You're in a **ghostel** terminal (an in-Emacs libghostty terminal) inside a
   reference files by path; no need to paste them.
 - **Point at a line as `path:line`, never as prose.** When you refer to a specific
   location — "the leftover blank lines", "the missing return", "this hunk" — write
-  it as `io.c:1320`, because ghostel auto-linkifies that shape: the user clicks it
-  (or `RET`/`C-t C-f`) and lands on that line in their Emacs. Prose like "line 1320
-  of io.c" is dead text they navigate by hand; `io.c:1320` is a click. Use a
-  project-relative or bare filename (it resolves against the terminal's directory),
-  give the real current-file line number, and prefer listing several concrete
-  `path:line` refs over describing a region vaguely.
+  it as `src/io.c:1320`, because ghostel auto-linkifies that shape: the user clicks
+  it (or `RET`/`C-t C-f`) and lands on that line in their Emacs. Prose like "line
+  1320 of io.c" is dead text they navigate by hand; a `path:line` is a click.
+  - **The path must resolve to a file that EXISTS from your current directory** —
+    ghostel only linkifies a `path:line` when `file-exists-p` succeeds relative to
+    the terminal's `pwd`. So use exactly the path you'd `cat` from where you are: a
+    relative path from `pwd` (`src/io.c:1320`, not a bare `io.c:1320` unless `pwd`
+    is that file's own directory), or an absolute path. A repo-root-relative path
+    only works when `pwd` is the repo root. When unsure, prefer the absolute path.
+  - Give the real current-file line number, and prefer several concrete `path:line`
+    refs over describing a region vaguely.
   - A column (`path:line:col`) is understood too but usually **not worth adding** —
     `line` is what the user wants, and a column that's off (tabs, 0- vs 1-indexed,
     a stale count) sends them to the wrong spot. Add `:col` only when you're
