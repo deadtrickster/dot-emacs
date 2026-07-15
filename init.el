@@ -74,6 +74,21 @@ ring on every use.  Neither line numbers nor a special case for line 1 are neede
     (insert "\n")
     (forward-line -1)
     (indent-according-to-mode))
+  (defun my-kill-line-no-save (&optional arg)
+    "Like \\[kill-line], but DELETE the text -- never save it to the kill ring
+or the system clipboard.  Bound to \\`C-k' here because this config forwards the
+kill ring to the clipboard (see the `select' block), so a stray `C-k' otherwise
+clobbers whatever you had copied.
+
+Reuses `kill-line' verbatim -- same point-to-EOL / whole-line / prefix-count /
+visual-line semantics -- but shadows the kill ring with a throwaway copy and
+disables the clipboard hook for the duration, so nothing escapes.  Yank still
+holds whatever it held before."
+    (interactive "P")
+    (let ((kill-ring kill-ring)
+          (kill-ring-yank-pointer kill-ring-yank-pointer)
+          (interprogram-cut-function nil))
+      (kill-line arg)))
   (defun rename-file-and-buffer ()
     "Rename the current buffer and file it is visiting."
     (interactive)
@@ -152,6 +167,7 @@ dimmed envrc `none' (inactive windows dimmer than active)."
   (global-set-key [f11] 'delete-trailing-whitespace)
   (global-set-key "\C-d" 'dired-jump)
   (global-set-key [C-return] 'insert-newline-before-line)
+  (global-set-key "\C-k" #'my-kill-line-no-save)  ; delete-to-EOL, never clobbers the clipboard
   (global-set-key (kbd "C-x b") #'ido-switch-buffer)
   (add-to-list 'auto-mode-alist '("\\(/\\|\\`\\)[Mm]akefile" . makefile-gmake-mode))
   (advice-add 'view-echo-area-messages
