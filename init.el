@@ -1768,7 +1768,10 @@ remembering this buffer to come back to."
 Scans the visible region for tool forms -- `Write(path)' / `Edit(path)' /
 `Read(path)' / `Update(path)' etc. -- and opens the one you pick (or the only
 one) in the other window, resolved against the terminal's directory.  A robust
-stand-in for clicking, since the TUI owns the mouse.  Bound to `C-t C-f'."
+stand-in for clicking, since the TUI owns the mouse.  Bound to `C-t C-f'.
+
+(For `path:line' / `path:line:col' references, ghostel linkifies those itself --
+click or RET on one and it jumps to the line; see `ghostel--open-link'.)"
     (interactive)
     (let* ((text (buffer-substring-no-properties (window-start) (window-end nil t)))
            (re (concat "\\_<\\(?:Write\\|Edit\\|Read\\|Update\\|Create\\|"

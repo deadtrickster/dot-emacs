@@ -65,7 +65,19 @@ You're in a **ghostel** terminal (an in-Emacs libghostty terminal) inside a
 - **The user navigates with `C-t`** (a prefix): `C-t C-c` claude, `C-t C-g` git,
   `C-t C-s` shell, and `C-t C-t` toggles between their code buffer and this
   terminal — so they hop away and back; you share the one byobu session. They
-  can also `C-t C-f` to open any file you name in your output (Write/Edit/Read
-  etc.) — so just reference files by path; no need to paste them.
+  can also `C-t C-f` to open any file/line you reference in your output — so just
+  reference files by path; no need to paste them.
+- **Point at a line as `path:line`, never as prose.** When you refer to a specific
+  location — "the leftover blank lines", "the missing return", "this hunk" — write
+  it as `io.c:1320`, because ghostel auto-linkifies that shape: the user clicks it
+  (or `RET`/`C-t C-f`) and lands on that line in their Emacs. Prose like "line 1320
+  of io.c" is dead text they navigate by hand; `io.c:1320` is a click. Use a
+  project-relative or bare filename (it resolves against the terminal's directory),
+  give the real current-file line number, and prefer listing several concrete
+  `path:line` refs over describing a region vaguely.
+  - A column (`path:line:col`) is understood too but usually **not worth adding** —
+    `line` is what the user wants, and a column that's off (tabs, 0- vs 1-indexed,
+    a stale count) sends them to the wrong spot. Add `:col` only when you're
+    genuinely pointing at a character position and are sure of it.
 - `bb` (re)attaches this project's byobu session from any shell; the working
   directory is tracked back into Emacs via OSC 7.
