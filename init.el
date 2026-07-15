@@ -548,6 +548,34 @@ each time.  So the listing draws immediately and the column lands a moment later
                   erc-mode-hook))
     (add-hook mode (lambda () (display-line-numbers-mode 0)))))
 
+(use-package ediff
+  :ensure nil
+  :custom
+  ;; Keep ediff IN THE CURRENT FRAME.  The default (`ediff-setup-windows-default')
+  ;; pops the control panel into a SEPARATE FRAME in a GUI -- a second window that
+  ;; steals focus and litters the display.  `plain' puts the control panel in a
+  ;; window of the current frame instead.
+  (ediff-window-setup-function #'ediff-setup-windows-plain)
+  ;; Side-by-side (A | B), not stacked -- code diffs read far better in columns.
+  (ediff-split-window-function #'split-window-horizontally)
+  (ediff-merge-split-window-function #'split-window-horizontally)
+  :config
+  ;; The layout fix.  ediff commandeers your windows to lay out A/B/control and
+  ;; does NOT put them back on quit -- so `vc-ediff', `vc-branch-diff''s ediff kin,
+  ;; magit's ediff actions and smerge all leave your carefully-split frame wrecked.
+  ;; Snapshot the whole window configuration the instant before ediff sets up, and
+  ;; restore it when ediff quits (depth 100 -> after ediff's own cleanup runs).
+  (defvar my-ediff--window-config nil
+    "Window configuration captured before ediff took over the frame.")
+  (add-hook 'ediff-before-setup-hook
+            (lambda () (setq my-ediff--window-config (current-window-configuration))))
+  (dolist (hook '(ediff-quit-hook ediff-suspend-hook))
+    (add-hook hook
+              (lambda ()
+                (when (window-configuration-p my-ediff--window-config)
+                  (set-window-configuration my-ediff--window-config)))
+              100)))
+
 (use-package flymake
   :ensure nil
   :custom
