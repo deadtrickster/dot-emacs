@@ -72,12 +72,16 @@ You're in a **ghostel** terminal (an in-Emacs libghostty terminal) inside a
   it as `src/io.c:1320`, because ghostel auto-linkifies that shape: the user clicks
   it (or `RET`/`C-t C-f`) and lands on that line in their Emacs. Prose like "line
   1320 of io.c" is dead text they navigate by hand; a `path:line` is a click.
-  - **The path must resolve to a file that EXISTS from your current directory** —
-    ghostel only linkifies a `path:line` when `file-exists-p` succeeds relative to
-    the terminal's `pwd`. So use exactly the path you'd `cat` from where you are: a
-    relative path from `pwd` (`src/io.c:1320`, not a bare `io.c:1320` unless `pwd`
-    is that file's own directory), or an absolute path. A repo-root-relative path
-    only works when `pwd` is the repo root. When unsure, prefer the absolute path.
+  - **The path MUST contain a slash, and MUST resolve to a file that exists from
+    your current directory.** ghostel's detector requires both: its path regex only
+    matches tokens containing a `/`, and it then linkifies only when `file-exists-p`
+    succeeds relative to the terminal's `pwd`. Consequences:
+    - A bare filename never linkifies, even in the right directory — `init.el:42`
+      is dead, `./init.el:42` is a link. For a repo-root file, prefix `./`.
+    - Use the path as you'd `cat` it from `pwd`: `src/io.c:1320`, `./init.el:42`,
+      or an absolute path. A repo-root-relative path only works when `pwd` is the
+      repo root; when unsure, prefer the absolute path (always has slashes, always
+      resolves).
   - Give the real current-file line number, and prefer several concrete `path:line`
     refs over describing a region vaguely.
   - A column (`path:line:col`) is understood too but usually **not worth adding** —
