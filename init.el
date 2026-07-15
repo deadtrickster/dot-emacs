@@ -534,6 +534,15 @@ each time.  So the listing draws immediately and the column lands a moment later
                   eshell-mode-hook
                   ghostel-mode-hook
                   compilation-mode-hook
+                  ;; Diff buffers: the line-number gutter would count the DIFF
+                  ;; buffer's own lines (1, 2, 3...), which look like file line
+                  ;; numbers but are not -- actively misleading.  The real source
+                  ;; line numbers are in each hunk header (@@ -old,+new @@), where
+                  ;; diff-mode already shows them.
+                  diff-mode-hook
+                  magit-diff-mode-hook
+                  magit-status-mode-hook
+                  magit-revision-mode-hook
                   telega-root-mode-hook
                   telega-chat-mode-hook
                   erc-mode-hook))
@@ -2599,6 +2608,80 @@ from BRANCH to the working tree, so it reads as \"what this branch changed\"
     ;; put where you were reading it.
     (let ((display-buffer-overriding-action '(nil . ((inhibit-same-window . t)))))
       (vc-version-diff (list buffer-file-name) branch nil))))
+
+;; Source line numbers in the left margin of a unified diff.
+;;
+;; A diff buffer's native line-number gutter counts the DIFF's OWN lines, which is
+;; useless -- what you want is "which line of the actual file is this?".  Those
+;; numbers are encoded once per hunk in the `@@ -old,+new @@' header; here we walk
+;; each hunk and hang the running source number off every line as an overlay:
+;; added/context lines get the NEW-file number (the working tree you are editing),
+;; removed lines the OLD-file number, dimmed.  (This is why `diff-mode' is in the
+;; `display-line-numbers' opt-out list above -- native gutter off, real one on.)
+(use-package diff-mode
+  :ensure nil
+  :init
+  (defun my-diff--lnum-put (num width dim)
+    (let ((ov (make-overlay (point) (point))))
+      (overlay-put ov 'my-diff-lnum t)
+      (overlay-put ov 'before-string
+                   (propertize (format (format "%%%dd " width) num)
+                               'face (if dim 'shadow 'line-number)))))
+
+  (defun my-diff--lnum-scan ()
+    "(Re)draw source line numbers over every hunk in this diff buffer."
+    (remove-overlays (point-min) (point-max) 'my-diff-lnum t)
+    (let ((old 0) (new 0) (width 3))
+      (save-excursion
+        ;; Pass 1: widest source number, so the gutter is a fixed width.
+        (goto-char (point-min))
+        (let ((max 0))
+          (while (re-search-forward
+                  "^@@ -\\([0-9]+\\)\\(?:,[0-9]+\\)? \\+\\([0-9]+\\)\\(?:,\\([0-9]+\\)\\)? @@" nil t)
+            (setq max (max max (+ (string-to-number (match-string 2))
+                                  (if (match-string 3) (string-to-number (match-string 3)) 0)))))
+          (setq width (max 3 (length (number-to-string max)))))
+        ;; Pass 2: number each line, advancing the two counters per its kind.
+        (goto-char (point-min))
+        (while (not (eobp))
+          (cond
+           ((looking-at "^@@ -\\([0-9]+\\)\\(?:,[0-9]+\\)? \\+\\([0-9]+\\)")
+            (setq old (string-to-number (match-string 1))
+                  new (string-to-number (match-string 2))))
+           ((looking-at "^ ")                                   ; context
+            (my-diff--lnum-put new width nil) (setq old (1+ old) new (1+ new)))
+           ((looking-at "^\\+")                                 ; added -> new file
+            (my-diff--lnum-put new width nil) (setq new (1+ new)))
+           ((looking-at "^-")                                   ; removed -> old file
+            (my-diff--lnum-put old width t) (setq old (1+ old))))
+          (forward-line 1)))))
+
+  (defvar-local my-diff--lnum-timer nil)
+  (defun my-diff--lnum-schedule (&rest _)
+    "Coalesce rescans -- vc inserts the diff asynchronously, in chunks."
+    (when (timerp my-diff--lnum-timer) (cancel-timer my-diff--lnum-timer))
+    (setq my-diff--lnum-timer
+          (run-with-idle-timer
+           0.05 nil
+           (lambda (buf)
+             (when (buffer-live-p buf)
+               (with-current-buffer buf
+                 (when (bound-and-true-p my-diff-source-line-numbers-mode)
+                   (my-diff--lnum-scan)))))
+           (current-buffer))))
+
+  (define-minor-mode my-diff-source-line-numbers-mode
+    "Show each diff line's SOURCE file line number in the left margin."
+    :lighter ""
+    (if my-diff-source-line-numbers-mode
+        (progn
+          ;; The diff content may arrive after the mode turns on (async vc), so
+          ;; redraw on change as well as now; both go through the debounced timer.
+          (add-hook 'after-change-functions #'my-diff--lnum-schedule nil t)
+          (my-diff--lnum-schedule))
+      (remove-hook 'after-change-functions #'my-diff--lnum-schedule t)
+      (remove-overlays (point-min) (point-max) 'my-diff-lnum t)))
+  :hook (diff-mode . my-diff-source-line-numbers-mode))
 
 (use-package rg
   :after (projectile consult)
