@@ -2554,7 +2554,51 @@ Defensive -- a failure here must never block the commit buffer from opening."
   ;; here was obsolete as of 30.1 and the byte-compiler said so on every load.)
   (define-advice vc-mode-line (:after (&rest _) strip-backend)
     (when (stringp vc-mode)
-      (setq vc-mode (replace-regexp-in-string "^ Git." "Γ:" vc-mode)))))
+      (setq vc-mode (replace-regexp-in-string "^ Git." "Γ:" vc-mode))))
+
+  (defun vc-branch-diff--main-branch ()
+    "The repository's main branch, best-effort.
+`origin/HEAD' names it when a remote is set; otherwise take whichever of
+master/main exists, else the current branch."
+    (or (let ((head (string-trim
+                     (shell-command-to-string
+                      "git rev-parse --abbrev-ref origin/HEAD 2>/dev/null"))))
+          (and (not (string-empty-p head))
+               (not (string-match-p "\\`fatal" head))
+               (replace-regexp-in-string "\\`origin/" "" head)))
+        (seq-find (lambda (b)
+                    (zerop (call-process "git" nil nil nil "rev-parse" "--verify"
+                                         "--quiet" (concat "refs/heads/" b))))
+                  '("master" "main"))
+        (car (vc-git-branches))))
+
+  (defun vc-branch-diff--branches ()
+    "Local + remote branch names, for completion."
+    (let ((default-directory (or (vc-root-dir) default-directory)))
+      (split-string
+       (shell-command-to-string
+        "git for-each-ref --format='%(refname:short)' refs/heads refs/remotes")
+       "\n" t)))
+
+  (defun vc-branch-diff (branch)
+    "Diff the current file against BRANCH's tip (default: the main branch).
+With a prefix argument, prompt for BRANCH with completion.  The diff runs
+from BRANCH to the working tree, so it reads as \"what this branch changed\"
+-- and it is the file ON DISK, so save first to include unsaved edits."
+    (interactive
+     (let ((default-directory (or (vc-root-dir) default-directory)))
+       (list (if current-prefix-arg
+                 (completing-read "Diff against branch: " (vc-branch-diff--branches)
+                                  nil nil nil nil (vc-branch-diff--main-branch))
+               (vc-branch-diff--main-branch)))))
+    (unless buffer-file-name
+      (user-error "This buffer is not visiting a file"))
+    ;; Show the diff in ANOTHER window, never on top of the file you asked about:
+    ;; `inhibit-same-window' pushes `display-buffer' to reuse the other window of a
+    ;; split (or make one) instead of the selected one, so the source buffer stays
+    ;; put where you were reading it.
+    (let ((display-buffer-overriding-action '(nil . ((inhibit-same-window . t)))))
+      (vc-version-diff (list buffer-file-name) branch nil))))
 
 (use-package rg
   :after (projectile consult)
