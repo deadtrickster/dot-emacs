@@ -2046,6 +2046,13 @@ just gets a `<2>' suffix).  This is what makes save/restore match reliably."
   ;; copy-mode (C-c C-t) can't be used here — it unpins tmux's alt-screen status
   ;; line.  Off by default for security; we accept the risk for the clipboard win.
   (ghostel-enable-osc52 t)
+  ;; Don't freeze the terminal into copy mode just because point left the live
+  ;; prompt.  Default is `copy': an isearch through the scrollback (which lands
+  ;; point away from the cursor) flips the whole terminal read-only, and since a
+  ;; terminal is where you TYPE, you then hit "Buffer is read-only" on the next
+  ;; keystroke.  nil keeps semi-char input alive; deliberate copy gestures (mouse
+  ;; drag, an activated region) still enter copy mode via their own settings.
+  (ghostel-point-leave-input-mode nil)
   ;; Let C-t pass through to Emacs instead of being sent to the shell, so our
   ;; C-t prefix (toggle / tab switch, bound in `ghostel-mode-map') works inside
   ;; the terminal.  Without this, ghostel's semi-char input map forwards C-t to
