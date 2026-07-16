@@ -266,7 +266,12 @@ bb() {
 # Reset a project's tabs to the defaults — forgets the saved layout and kills the
 # session (asks first); reopen with `bb' (or C-t in Emacs) for fresh defaults.
 bb-reset() {
-    local session="projectile/${PROJECTILE_PROJECT_NAME:-$(basename "$PWD")}"
+    # Derive the session name EXACTLY as `bb' does -- from the git top-level, with
+    # . : sanitized to _ -- or the kill/rm below target a name that never exists
+    # (e.g. `projectile/.emacs.d' instead of `projectile/_emacs_d'), silently
+    # leaving the real session running.
+    local rawproj="${PROJECTILE_PROJECT_NAME:-$(basename "$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || echo "$PWD")")}"
+    local session="projectile/${rawproj//[.: ]/_}"
     local ans
     read -rp "Reset '$session' to default tabs? Kills the session. [y/N] " ans
     case "$ans" in

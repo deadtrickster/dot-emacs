@@ -9,16 +9,22 @@ dir="${BYOBU_CONFIG_DIR:-$HOME/.config/byobu}/layouts"
 mkdir -p "$dir"
 
 save_one() {
-    local session="$1"
+    local session="$1" windows
     case "$session" in
+        projectile/*"^v"*) return 0 ;; # ephemeral `bb -g' grouped view -- never persist
         projectile/*) ;;
         *) return 0 ;; # only manage projectile sessions
     esac
     # De-dup (preserving order) so a momentarily-duplicated session never gets
     # persisted as twin tabs -- otherwise the next fresh `bb' recreates them and
     # the duplication compounds across reboots.
-    tmux list-windows -t "=$session" -F '#{window_name}' 2>/dev/null |
-        awk '!seen[$0]++' >"$dir/${session//\//__}"
+    windows=$(tmux list-windows -t "=$session" -F '#{window_name}' 2>/dev/null |
+        awk '!seen[$0]++')
+    # A session being torn down (`bb-reset', last window closed) lists no windows.
+    # Don't clobber its layout with an EMPTY file: that litters, and it would
+    # resurrect a session `bb-reset' just cleared on the next reopen.
+    [ -n "$windows" ] || return 0
+    printf '%s\n' "$windows" >"$dir/${session//\//__}"
 }
 
 if [[ $# -gt 0 && -n "${1:-}" ]]; then
