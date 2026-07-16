@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Pre-write review gate: show the user a PROPOSED change to a file in their
+# running Emacs and BLOCK until they accept or reject it -- the counterpart to
+# reviewing a commit AFTER the fact.  Use it before a risky edit lands.
+#
+#   ediff-review <target> <proposed>
+#
+# TARGET is the file as it stands now; PROPOSED is a file holding the full new
+# contents (write it to the scratchpad first).  A diff buffer opens in Emacs whose
+# GREEN (+) lines the user can edit to adjust wording; C-c C-c applies the (edited)
+# diff onto TARGET, C-c C-k rejects (TARGET untouched).  Prints ACCEPTED/REJECTED.
+#
+# It BLOCKS the same way a terminal `git commit' does: it hands a request file to
+# a plain (non `-n') `emacsclient', which waits until Emacs `server-edit's that
+# buffer -- exactly what accept/reject do.  No polling.  Run it in the BACKGROUND
+# so its completion wakes you.  Standalone so it works from a non-interactive
+# shell.  Allowlist: Bash(ediff-review:*)
+set -euo pipefail
+
+target="${1:?usage: ediff-review <target> <proposed>}"
+proposed="${2:?usage: ediff-review <target> <proposed>}"
+target=$(realpath -m -- "$target")
+proposed=$(realpath -m -- "$proposed")
+
+[ -f "$target" ] || {
+    echo "ediff-review: target does not exist: $target" >&2
+    exit 2
+}
+[ -f "$proposed" ] || {
+    echo "ediff-review: proposed file does not exist: $proposed" >&2
+    exit 2
+}
+
+sd=$(git rev-parse --absolute-git-dir 2>/dev/null || printf '%s' "${TMPDIR:-/tmp}")
+sd="$sd/ediff-review"
+mkdir -p "$sd"
+req="$sd/$$.review"
+# The request file carries the two paths, one per line; `my-agent-diff--maybe-
+# review' (find-file-hook) reads them and builds the diff.  accept/reject
+# overwrites this file with the verdict and releases us.
+printf '%s\n%s\n' "$target" "$proposed" >"$req"
+
+enotify "review a proposed change to $(basename "$target") (C-t C-t): C-c C-c apply / C-c C-k reject"
+
+# Blocks until the review buffer is finished (server-edit), like GIT_EDITOR does.
+emacsclient "$req" >/dev/null
+
+outcome=$(head -n1 "$req")
+rm -f "$req"
+echo "$outcome"

@@ -1150,7 +1150,7 @@ buffers, window layout, and project terminals."
     (let ((bin-src (expand-file-name "shell/bin" repo))
           (bin-dst (expand-file-name "~/.local/bin")))
       (dolist (f '("eopen" "esay" "enotify" "ecommit" "ebuffer" "esh" "etab"
-                   "oriole-pgindent" "oriole-yapf"))
+                   "ediff-review" "oriole-pgindent" "oriole-yapf"))
         (let ((src (expand-file-name f bin-src))
               (dst (expand-file-name f bin-dst)))
           (when (file-exists-p src)
@@ -1217,7 +1217,8 @@ buffers, window layout, and project terminals."
                                       (puthash "permissions" h data) h)))
                          (allow (or (gethash "allow" perms) (vector))))
                     (dolist (rule '("Bash(eopen:*)" "Bash(esay:*)" "Bash(enotify:*)"
-                                    "Bash(ecommit:*)" "Bash(ebuffer:*)" "Bash(esh:*)"))
+                                    "Bash(ecommit:*)" "Bash(ebuffer:*)" "Bash(esh:*)"
+                                    "Bash(ediff-review:*)"))
                       (unless (seq-contains-p allow rule)
                         (setq allow (vconcat allow (vector rule)) changed t)))
                     (puthash "allow" allow perms))
@@ -2743,6 +2744,269 @@ from BRANCH to the working tree, so it reads as \"what this branch changed\"
           (my-diff--lnum-schedule))
       (remove-hook 'after-change-functions #'my-diff--lnum-schedule t)
       (remove-overlays (point-min) (point-max) 'my-diff-lnum t)))
+
+  ;; ---- agent-diff: a PRE-WRITE, EDITABLE human-in-the-loop gate for an edit ----
+  ;; The `e*'-script model reviews an edit only AFTER it lands (the magit commit).
+  ;; This adds the missing half: show a proposed change, let you TWEAK it, and
+  ;; approve/reject it BEFORE it's written.  The `ediff-review TARGET PROPOSED'
+  ;; script hands off a small `<pid>.review' request file (two lines: TARGET then
+  ;; PROPOSED) to a BLOCKING `emacsclient' -- the very same server-edit "wait until
+  ;; you finish" routing that makes a terminal `git commit'
+  ;; (GIT_EDITOR=emacsclient) block on the commit buffer until C-c C-c.  Opening
+  ;; that file trips `my-agent-diff--maybe-review' (on `find-file-hook'), which
+  ;; renders a unified diff INTO the buffer under `my-agent-diff-mode'.  There the
+  ;; GREEN (`+') side is a real editable surface: reword a `+' line, RET to add a
+  ;; `+' line, C-k to drop one.  C-c C-c applies (the diff is `patch'ed onto
+  ;; TARGET), C-c C-k rejects.  Either overwrites the request file with the verdict
+  ;; and `server-edit's it, releasing the client so the script prints
+  ;; ACCEPTED / REJECTED -- no polling, no result file, no sleep.
+  ;;
+  ;; A diff + the original file IS enough to rebuild the new file (that's what
+  ;; `patch'/`git apply' do).  The one invariant that keeps an EDITED diff valid is
+  ;; that the hunk line numbers stay straight, so:
+  ;;   - the OLD side (context + `-' removed lines) is frozen with the `read-only'
+  ;;     TEXT PROPERTY (the comint-prompt technique) -- it must match TARGET
+  ;;     byte-for-byte, so `patch' never fuzzes;
+  ;;   - only the GREEN side is mutable, and add/remove go through commands that
+  ;;     re-run `my-agent-diff--renumber' -- recomputing every `@@ -a,b +c,d @@' from
+  ;;     the body (a frozen; b,d counted; c advanced by the running add-minus-remove
+  ;;     delta).  So the diff is always internally consistent when applied.
+  ;; Idea lifted from xenodium's agent-shell (`agent-shell-diff'); the framework is
+  ;; not -- this is elisp on built-in diff-mode + the server, reusing the
+  ;; source-line-number gutter above.
+  ;;
+  ;; Defined here in :init (not :config): diff-mode is DEFERRED (autoloaded on the
+  ;; `:hook'), but the request file may open on a fresh Emacs where that hasn't
+  ;; happened.  The body `require's diff-mode, so eager defun is free.
+  (defvar-local my-agent-diff--state nil
+    "In an `*agent-review*' buffer: (TARGET PROPOSED REQUEST-BUFFER).")
+  (defvar-local my-agent-diff--resolved nil
+    "Non-nil once this review has been accepted/rejected -- guards double-release.")
+
+  (defun my-agent-diff--on-green-p ()
+    "Non-nil if point's line is an added (green `+') line, not the `+++' header."
+    (save-excursion
+      (beginning-of-line)
+      (and (eq (char-after) ?+) (not (looking-at "^\\+\\+\\+")))))
+
+  (defun my-agent-diff--lock ()
+    "Freeze everything except the CONTENT of green (`+') lines with the `read-only'
+text property.  The leading `+', the trailing newline, and every non-green line
+are locked; the `+' marker is rear-nonsticky so you can type right after it.  So
+arbitrary keys can't corrupt the diff -- only add/remove commands (which re-lock)
+change structure.  Idempotent; safe to re-run after every edit."
+    (let ((inhibit-read-only t))
+      (save-excursion
+        (goto-char (point-min))
+        (while (not (eobp))
+          (let ((bol (line-beginning-position))
+                (eol (line-end-position)))
+            (if (and (eq (char-after bol) ?+) (not (looking-at "^\\+\\+\\+")))
+                (progn                  ; green line: lock only the `+' and newline
+                  (add-text-properties bol (1+ bol) '(read-only t rear-nonsticky t))
+                  (when (< eol (point-max))
+                    (put-text-property eol (1+ eol) 'read-only t)))
+              (put-text-property bol (min (point-max) (1+ eol)) 'read-only t)))
+          (forward-line 1)))))
+
+  (defun my-agent-diff--renumber ()
+    "Rewrite every hunk header so its counts match the current body: OLD start `a'
+kept, `b'=context+removed, `d'=context+added, and each new start `c' advanced by
+the running (added-minus-removed) delta.  Keeps an edited diff valid to `patch'."
+    (let ((inhibit-read-only t)
+          (delta 0))
+      (save-excursion
+        (goto-char (point-min))
+        (while (re-search-forward
+                "^@@ -\\([0-9]+\\)\\(?:,[0-9]+\\)? \\+[0-9]+\\(?:,[0-9]+\\)? @@\\(.*\\)$"
+                nil t)
+          (let ((a (string-to-number (match-string 1)))
+                (tail (match-string 2))
+                (hstart (match-beginning 0))
+                (hend (match-end 0))
+                (ctx 0) (add 0) (del 0))
+            (save-excursion             ; count this hunk's body lines by marker
+              (goto-char hend)
+              (forward-line 1)
+              (while (and (not (eobp))
+                          (not (looking-at "^@@\\|^--- \\|^\\+\\+\\+ \\|^diff ")))
+                (cond ((eq (char-after) ?\s) (setq ctx (1+ ctx)))
+                      ((eq (char-after) ?+) (setq add (1+ add)))
+                      ((eq (char-after) ?-) (setq del (1+ del))))
+                (forward-line 1)))
+            (let ((b (+ ctx del))
+                  (d (+ ctx add))
+                  (c (+ a delta)))
+              (setq delta (+ delta (- d b)))
+              (goto-char hstart)
+              (delete-region hstart hend)
+              (insert (format "@@ -%d,%d +%d,%d @@%s" a b c d tail))))))))
+
+  (defun my-agent-diff--refresh ()
+    "Keep the buffer consistent after a structural edit: fix the hunk counts, then
+re-freeze everything but the green content.  Point is preserved (both passes wrap
+`save-excursion')."
+    (my-agent-diff--renumber)
+    (my-agent-diff--lock))
+
+  (defun my-agent-diff--release (reqbuf outcome)
+    "Overwrite REQBUF (the `.review' request file) with OUTCOME and let its
+blocking `emacsclient' go, via `server-edit' -- the same release C-c C-c does
+for a commit buffer.  If no client is attached (ran by hand), just save+bury."
+    (require 'server)
+    (when (buffer-live-p reqbuf)
+      (with-current-buffer reqbuf
+        (let ((inhibit-read-only t))
+          (set-text-properties (point-min) (point-max) nil)
+          (erase-buffer)
+          (insert outcome "\n"))
+        (when (buffer-file-name) (save-buffer))
+        (if server-buffer-clients        ; buffer-local list of the waiting clients
+            (server-done)               ; releases emacsclient -> the script unblocks
+          (kill-buffer)))))
+
+  (defun my-agent-diff--apply (target)
+    "Apply THIS review buffer's (possibly edited) unified diff onto TARGET.
+Renumbers first so an added/removed green line leaves the hunk counts correct,
+then `patch'es.  Signals on failure, leaving TARGET untouched."
+    (my-agent-diff--renumber)
+    (let ((patch (make-temp-file "agent-diff" nil ".patch"
+                                 (buffer-substring-no-properties
+                                  (point-min) (point-max))))
+          (out (make-temp-file "agent-diff-out")))
+      (unwind-protect
+          (let ((status (call-process "patch" nil nil nil
+                                      "-s" "--reject-file=/dev/null"
+                                      "-o" out target patch)))
+            (if (eq status 0)
+                (copy-file out target t)
+              (error "agent-diff: patch could not apply the edited diff (exit %s); %s untouched"
+                     status (file-name-nondirectory target))))
+        (ignore-errors (delete-file patch))
+        (ignore-errors (delete-file out)))))
+
+  (defun my-agent-diff--finish (outcome)
+    "Resolve the review with OUTCOME (\"ACCEPTED\"/\"REJECTED\").
+On accept, `patch' the (edited) diff onto TARGET; either way release the blocking
+`emacsclient' with the verdict and close the review buffer.  If the patch fails
+the review stays open (unresolved) so you can fix it or reject."
+    (unless my-agent-diff--resolved
+      (pcase-let ((`(,target ,_proposed ,reqbuf) my-agent-diff--state))
+        (when (equal outcome "ACCEPTED")
+          (my-agent-diff--apply target)         ; signals on failure -> aborts here
+          (let ((buf (get-file-buffer target)))  ; refresh a live buffer on TARGET
+            (when buf (with-current-buffer buf (revert-buffer t t t)))))
+        (setq my-agent-diff--resolved t)         ; only past a successful apply
+        (my-agent-diff--release reqbuf outcome)
+        (message "agent-diff: %s" outcome)
+        (when (buffer-live-p reqbuf) (kill-buffer reqbuf)))))
+
+  (defun my-agent-diff-accept ()
+    "Apply the (possibly edited) change to TARGET."
+    (interactive) (my-agent-diff--finish "ACCEPTED"))
+  (defun my-agent-diff-reject ()
+    "Reject the change: TARGET is left untouched."
+    (interactive) (my-agent-diff--finish "REJECTED"))
+  (defun my-agent-diff-locked-key ()
+    "Refuse an edit that isn't on the green (`+') side."
+    (interactive)
+    (message "agent-review: only the green (+) side is editable (RET add, C-k drop)"))
+
+  (defun my-agent-diff-open-green ()
+    "Add a new empty green (`+') line after the current one and land in it."
+    (interactive)
+    (if (not (my-agent-diff--on-green-p))
+        (my-agent-diff-locked-key)
+      (let ((inhibit-read-only t))
+        (forward-line 1)
+        (insert "+\n")
+        (forward-line -1)
+        (end-of-line))                  ; point on the new (empty) green content
+      (my-agent-diff--refresh)))
+
+  (defun my-agent-diff-kill-green ()
+    "Delete the current green (`+') line entirely."
+    (interactive)
+    (if (not (my-agent-diff--on-green-p))
+        (my-agent-diff-locked-key)
+      (let ((inhibit-read-only t))
+        (delete-region (line-beginning-position)
+                       (min (point-max) (1+ (line-end-position)))))
+      (my-agent-diff--refresh)))
+
+  (define-derived-mode my-agent-diff-mode diff-mode "AgentReview"
+    "Review, lightly EDIT, then apply/reject a proposed change to a file.
+Only the green (`+') side is mutable: reword a line in place, \\[my-agent-diff-open-green] to add a
+line, \\[my-agent-diff-kill-green] to drop one -- the hunk counts are kept straight automatically.
+\\[my-agent-diff-accept] applies (the diff is `patch'ed onto the target), \\[my-agent-diff-reject] rejects.")
+
+  (define-key my-agent-diff-mode-map (kbd "C-c C-c") #'my-agent-diff-accept)
+  (define-key my-agent-diff-mode-map (kbd "C-c C-k") #'my-agent-diff-reject)
+  (define-key my-agent-diff-mode-map (kbd "RET")     #'my-agent-diff-open-green)
+  (define-key my-agent-diff-mode-map (kbd "C-j")     #'my-agent-diff-open-green)
+  (define-key my-agent-diff-mode-map (kbd "C-k")     #'my-agent-diff-kill-green)
+  (define-key my-agent-diff-mode-map (kbd "C-o")     #'my-agent-diff-locked-key)
+
+  (defun my-agent-diff (target proposed reqbuf)
+    "Render a review of replacing TARGET's contents with PROPOSED's INTO reqbuf --
+the `.review' server buffer the blocking `emacsclient' waits on, so you act right
+here (as with git-commit in COMMIT_EDITMSG).  The green side is editable."
+    (require 'diff-mode)
+    (setq target (expand-file-name target)
+          proposed (expand-file-name proposed))
+    (let* ((lbl (abbreviate-file-name target))
+           (diff (let ((tmp (generate-new-buffer " *agent-diff-gen*")))
+                   (unwind-protect
+                       (save-window-excursion
+                         (diff-no-select target proposed
+                                         (list "-u" "--label" lbl "--label" lbl)
+                                         t tmp)
+                         (with-current-buffer tmp (buffer-string)))
+                     (kill-buffer tmp)))))
+      (with-current-buffer reqbuf
+        (let ((inhibit-read-only t))
+          (set-text-properties (point-min) (point-max) nil)
+          (erase-buffer)
+          (insert diff))
+        (goto-char (point-min))
+        (my-agent-diff-mode)
+        (my-diff-source-line-numbers-mode 1)   ; the source-line gutter, explicitly
+        (rename-buffer (format "*agent-review: %s*"
+                               (file-name-nondirectory target))
+                       t)
+        (setq my-agent-diff--state (list target proposed reqbuf)
+              my-agent-diff--resolved nil)
+        (my-agent-diff--lock)           ; freeze all but the green content
+        ;; A manual kill (anything that skips accept/reject) must still let the
+        ;; blocking client go -- default an undecided review to REJECTED.
+        (add-hook 'kill-buffer-hook
+                  (lambda ()
+                    (unless my-agent-diff--resolved
+                      (setq my-agent-diff--resolved t)
+                      (my-agent-diff--release (nth 2 my-agent-diff--state) "REJECTED")))
+                  nil t)
+        (setq header-line-format
+              (concat "  agent-review   "
+                      (propertize "C-c C-c" 'face 'success) " apply    "
+                      (propertize "C-c C-k" 'face 'error) " reject    "
+                      (propertize "RET" 'face 'link) "/" (propertize "C-k" 'face 'link)
+                      " add/drop green line    "
+                      (propertize (file-name-nondirectory target) 'face 'bold)))
+        (set-buffer-modified-p nil))
+      "OK"))
+
+  (defun my-agent-diff--maybe-review ()
+    "On `find-file-hook': if this is an `ediff-review' request file (`*.review'
+under a `.git/ediff-review/' dir), read its TARGET/PROPOSED lines and render the
+review INTO this buffer -- it holds the blocking client, so it must stay the
+waiter."
+    (let ((f (buffer-file-name)))
+      (when (and f (string-suffix-p ".review" f)
+                 (string-search "/ediff-review/" f))
+        (let ((lines (split-string (buffer-string) "\n" t)))
+          (when (and (nth 0 lines) (nth 1 lines))
+            (my-agent-diff (nth 0 lines) (nth 1 lines) (current-buffer)))))))
+  (add-hook 'find-file-hook #'my-agent-diff--maybe-review)
   :hook (diff-mode . my-diff-source-line-numbers-mode))
 
 (use-package rg

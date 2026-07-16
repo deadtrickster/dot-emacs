@@ -62,6 +62,21 @@ You're in a **ghostel** terminal (an in-Emacs libghostty terminal) inside a
   review, and press Enter to run. Short one-liners can go inline: `etab test "…"`.
   This is the inverse of `esh` (which runs a sudo command); `etab` never runs
   anything. The `<tab>` is the byobu window name they said (`test`, `shell`, …).
+- **Propose a risky edit for review with `ediff-review <target> <proposed>`.**
+  When a change is consequential enough that you want the user to approve it
+  BEFORE it lands — instead of editing the file directly and relying on the
+  after-the-fact commit review — write the FULL new contents to a scratchpad file
+  and run `ediff-review <target-file> <that-scratch-file>` **in the BACKGROUND**
+  (`run_in_background`; it BLOCKS until they decide). It opens a diff review in
+  their Emacs whose GREEN (`+`) side they can EDIT — reword a line, `RET` to add
+  one, `C-k` to drop one — then `C-c C-c` applies the (possibly edited) diff onto
+  `<target-file>`, `C-c C-k` rejects. When they decide, the command returns and
+  prints `ACCEPTED` or `REJECTED` — that completion wakes you. On `ACCEPTED`,
+  **re-read `<target-file>`**: they may have adapted your wording, so the file can
+  differ from what you proposed. On `REJECTED` the target is untouched. Their
+  decision in Emacs is the *sole* approval — it's allowlisted, so there's no
+  separate permission prompt. Use it for edits worth a human gate; keep using the
+  normal file tools for routine ones.
 - **The user navigates with `C-t`** (a prefix): `C-t C-c` claude, `C-t C-g` git,
   `C-t C-s` shell, and `C-t C-t` toggles between their code buffer and this
   terminal — so they hop away and back; you share the one byobu session. They
