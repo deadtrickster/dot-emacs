@@ -1218,7 +1218,7 @@ buffers, window layout, and project terminals."
                          (allow (or (gethash "allow" perms) (vector))))
                     (dolist (rule '("Bash(eopen:*)" "Bash(esay:*)" "Bash(enotify:*)"
                                     "Bash(ecommit:*)" "Bash(ebuffer:*)" "Bash(esh:*)"
-                                    "Bash(ediff-review:*)"))
+                                    "Bash(etab:*)" "Bash(ediff-review:*)"))
                       (unless (seq-contains-p allow rule)
                         (setq allow (vconcat allow (vector rule)) changed t)))
                     (puthash "allow" allow perms))
