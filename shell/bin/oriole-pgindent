@@ -24,7 +24,24 @@ fi
 
 repo=$(git -C "$(dirname "$src")" rev-parse --show-toplevel 2>/dev/null || true)
 td=()
-[ -n "$repo" ] && [ -f "$repo/orioledb.typedefs" ] && td=(--typedefs="$repo/orioledb.typedefs")
+if [ -n "$repo" ]; then
+    typedefs="$repo/orioledb.typedefs"
+    # orioledb.typedefs is GENERATED (gitignored: `make USE_PGXS=1 orioledb.typedefs'),
+    # so a worktree that hasn't been built lacks it -- and without a typedefs list
+    # pgindent errors out, so we'd pass through and format NOTHING.  Fall back to any
+    # SIBLING worktree of the same repo that has one: the type list is essentially
+    # branch-independent, and a slightly stale list beats not formatting at all.
+    if [ ! -f "$typedefs" ]; then
+        while IFS= read -r w; do
+            if [ -f "$w/orioledb.typedefs" ]; then
+                typedefs="$w/orioledb.typedefs"
+                break
+            fi
+        done < <(git -C "$repo" worktree list --porcelain 2>/dev/null |
+            sed -n 's/^worktree //p')
+    fi
+    [ -f "$typedefs" ] && td=(--typedefs="$typedefs")
+fi
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
