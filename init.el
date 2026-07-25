@@ -2488,7 +2488,69 @@ more readily.")
 (use-package markdown-mode
   :custom
   ;; GitHub-flavored rendering for the live preview, via node's `marked' (gfm).
-  (markdown-command "marked"))
+  (markdown-command "marked")
+  :config
+  ;; Quick "render to PDF" via pandoc + typst -- typst is a single ~30MB binary
+  ;; (installed with `mise use -g typst'), renders in well under a second, and needs
+  ;; no TeX and no headless browser.  pandoc drives it with `--pdf-engine=typst'.
+  ;; Async so a slow render never blocks Emacs; opens the PDF when it lands.
+  (defvar my-markdown-pdf-font "DejaVu Sans"
+    "Main font for `my-markdown-export-pdf'.
+pandoc's typst template sets an empty font list by default, which typst >= 0.13
+rejects (\"font fallback list must not be empty\"), so a real, installed font must
+be named.  DejaVu Sans ships nearly everywhere; change if you prefer another.")
+
+  (defun my-markdown--typst ()
+    "Path to a typst binary, preferring the stable mise shim."
+    (or (executable-find "typst")
+        (let ((shim (expand-file-name "~/.local/share/mise/shims/typst")))
+          (and (file-executable-p shim) shim))
+        (car (file-expand-wildcards
+              (expand-file-name "~/.local/share/mise/installs/typst/latest/*/typst")))))
+
+  (defun my-markdown-export-pdf ()
+    "Render the current Markdown buffer to a PDF beside it, then open it.
+Uses `pandoc --pdf-engine=typst'.  Asynchronous; a message names the file."
+    (interactive)
+    (let ((pandoc (or (executable-find "pandoc")
+                      (user-error "pandoc not found")))
+          (typst (or (my-markdown--typst)
+                     (user-error "typst not found (install: mise use -g typst)"))))
+      ;; Work from the file on disk; save first so we render what you see.
+      (when (and buffer-file-name (buffer-modified-p))
+        (save-buffer))
+      (let* ((src (or buffer-file-name
+                      (let ((f (make-temp-file "md-" nil ".md")))
+                        (write-region (point-min) (point-max) f) f)))
+             (pdf (concat (file-name-sans-extension src) ".pdf"))
+             ;; pandoc invokes `typst' by name -> put its dir on PATH for the child.
+             (process-environment
+              (cons (concat "PATH=" (file-name-directory typst)
+                            path-separator (getenv "PATH"))
+                    process-environment)))
+        (message "Rendering %s -> PDF…" (file-name-nondirectory pdf))
+        (make-process
+         :name "markdown-pdf"
+         :buffer (get-buffer-create "*markdown-pdf*")
+         :command (list pandoc src "-o" pdf "--pdf-engine=typst"
+                        "-V" (concat "mainfont=" my-markdown-pdf-font))
+         :noquery t
+         :sentinel
+         (lambda (proc _event)
+           (unless (process-live-p proc)
+             (if (and (eq (process-exit-status proc) 0) (file-exists-p pdf))
+                 (progn
+                   (message "PDF: %s" pdf)
+                   (call-process "xdg-open" nil 0 nil pdf))
+               (message "PDF render FAILED — see *markdown-pdf*"))))))))
+
+  ;; Put it in the Markdown menu, which is also what the mode-line major-mode menu
+  ;; (mouse-1/-3 on "Markdown") shows -- so it's one click from the mode line.
+  (easy-menu-add-item markdown-mode-menu nil
+                      ["Quick Export to PDF" my-markdown-export-pdf
+                       :help "Render this buffer to a PDF (pandoc + typst) and open it"]
+                      "Preview & Export")
+  :bind (:map markdown-mode-command-map ("p" . my-markdown-export-pdf)))
 
 (use-package markdown-preview-mode
   ;; GitHub-flavored live preview: `C-c C-c g' toggles a browser preview that
