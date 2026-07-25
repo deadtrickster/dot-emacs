@@ -2529,20 +2529,27 @@ Uses `pandoc --pdf-engine=typst'.  Asynchronous; a message names the file."
                             path-separator (getenv "PATH"))
                     process-environment)))
         (message "Rendering %s -> PDF…" (file-name-nondirectory pdf))
-        (make-process
-         :name "markdown-pdf"
-         :buffer (get-buffer-create "*markdown-pdf*")
-         :command (list pandoc src "-o" pdf "--pdf-engine=typst"
-                        "-V" (concat "mainfont=" my-markdown-pdf-font))
-         :noquery t
-         :sentinel
-         (lambda (proc _event)
-           (unless (process-live-p proc)
-             (if (and (eq (process-exit-status proc) 0) (file-exists-p pdf))
-                 (progn
-                   (message "PDF: %s" pdf)
-                   (call-process "xdg-open" nil 0 nil pdf))
-               (message "PDF render FAILED — see *markdown-pdf*"))))))))
+        ;; Stash the target on the process rather than closing over it: the sentinel
+        ;; then reads it back with `process-get' and can't hit a void `pdf' if the
+        ;; binding is ever evaluated dynamically.
+        (let ((proc (make-process
+                     :name "markdown-pdf"
+                     :buffer (get-buffer-create "*markdown-pdf*")
+                     :command (list pandoc src "-o" pdf "--pdf-engine=typst"
+                                    "-V" (concat "mainfont=" my-markdown-pdf-font))
+                     :noquery t
+                     :sentinel #'my-markdown--pdf-sentinel)))
+          (process-put proc 'pdf pdf)))))
+
+  (defun my-markdown--pdf-sentinel (proc _event)
+    "Sentinel for `my-markdown-export-pdf': open the PDF, or report failure."
+    (unless (process-live-p proc)
+      (let ((pdf (process-get proc 'pdf)))
+        (if (and (eq (process-exit-status proc) 0) pdf (file-exists-p pdf))
+            (progn
+              (message "PDF: %s" pdf)
+              (call-process "xdg-open" nil 0 nil pdf))
+          (message "PDF render FAILED — see *markdown-pdf*")))))
 
   ;; Put it in the Markdown menu, which is also what the mode-line major-mode menu
   ;; (mouse-1/-3 on "Markdown") shows -- so it's one click from the mode line.
