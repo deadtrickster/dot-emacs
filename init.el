@@ -2216,8 +2216,23 @@ build that produces the module).  Installed on success by ghostel's own
            (buf (let ((default-directory source-dir))
                   (make-term "ghostel-module-build" shell-file-name nil "-c" cmd))))
       (with-current-buffer buf
-        (term-mode)
+        ;; NB: no (term-mode) here -- `make-term' already ran it (and started the
+        ;; process); a second call re-inits the mode on a live buffer.
         (term-char-mode)                  ; full emulation while output streams in
+        ;; Make the build buffer navigable WITHOUT breaking in-place.  term decides
+        ;; char-vs-line mode by identity -- `term-in-char-mode' is
+        ;; `(eq (current-local-map) term-raw-map)' -- and its OUTPUT emulator takes
+        ;; the line-mode path (no cursor-addressed redraws => no in-place) whenever
+        ;; that is false.  So we must NOT swap in a different map; instead make
+        ;; `term-raw-map' itself buffer-local as a modified COPY: the eq check still
+        ;; holds (char-mode + in-place preserved), while C-x and q now reach Emacs
+        ;; instead of the PTY.  The build reads no stdin, so freeing those keys costs
+        ;; nothing.
+        (let ((m (copy-keymap term-raw-map)))
+          (define-key m (kbd "C-x") nil)          ; C-x b, C-x o, ... reach Emacs
+          (define-key m (kbd "q") #'quit-window)  ; bury the build log
+          (setq-local term-raw-map m)
+          (use-local-map m))
         (setq-local default-directory source-dir)
         ;; permanent-local (see the defvars) -> survive the mode setup; read by the
         ;; installer to find and move the freshly-built module.
