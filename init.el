@@ -270,8 +270,17 @@ mouse-3: Next buffer" mouse-face mode-line-highlight local-map
     ("#D3D7CF" . "#EEEEEC")])
   :config
   (defun display-ansi-colors ()
+    "Colorize raw ANSI escape sequences in the current buffer.
+Handles read-only buffers (e.g. a stale *compilation* buffer from before
+`ansi-color-compilation-filter' was attached), so `M-x display-ansi-colors'
+retro-fixes one that streamed in uncolored."
     (interactive)
-    (ansi-color-apply-on-region (point-min) (point-max))))
+    (let ((inhibit-read-only t))
+      (ansi-color-apply-on-region (point-min) (point-max))))
+  ;; Colorize ANSI escapes in *compilation* output as it streams in.  Without this
+  ;; the buffer shows raw `ESC[32m'-style sequences instead of colors -- tools that
+  ;; force color (cargo, pytest, ripgrep, jest) dump escape codes verbatim.
+  (add-hook 'compilation-filter-hook #'ansi-color-compilation-filter))
 
 (use-package auth-source
   :ensure nil
