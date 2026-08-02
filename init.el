@@ -2069,6 +2069,13 @@ just gets a `<2>' suffix).  This is what makes save/restore match reliably."
   ;; the PTY.  (The :set on this defcustom rebuilds the input keymap.)
   (ghostel-keymap-exceptions '("C-c" "C-x" "C-u" "C-h" "M-x" "M-:" "C-\\" "C-t"
                                "C-<up>" "C-<down>" "C-<left>" "C-<right>"))
+  ;; Force `--color on' for the native-module build.  zig's color is `auto', which
+  ;; it turns OFF unless it positively detects a color terminal -- and it doesn't
+  ;; over term.el's pty (TERM=eterm-color), so error/warning colors were missing.
+  ;; `--color on' makes zig always emit SGR, which term.el (see the module-build
+  ;; override in :config) then renders.
+  (ghostel-module-compile-command
+   "zig build --color on --prefix %s -Doptimize=ReleaseFast -Dcpu=baseline")
   :custom-face
   ;; The installed ghostel palette inherits `ansi-color-*' (red3, green3, …),
   ;; but the theme customizes `term-color-*'.  Point the palette at the themed
