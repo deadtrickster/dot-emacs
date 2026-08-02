@@ -2152,6 +2152,51 @@ just gets a `<2>' suffix).  This is what makes save/restore match reliably."
           (term-line-mode)                ; done building -> navigable, not a live TTY
           (setq buffer-read-only t)))))
 
+  ;; term.el emulates CSI/cursor/color but NOT `ESC(' charset designation (its ESC
+  ;; dispatch has no `?(' case), so zig's progress TREE -- drawn with the VT100
+  ;; line-drawing charset (ESC(0 ... q/x/t/m ... ESC(B) -- shows up as a tofu box
+  ;; (the raw ESC) plus literal `(0q(B'.  This filter consumes those designations
+  ;; and rewrites the line-drawing bytes to the UTF-8 bytes of the matching Unicode
+  ;; box char BEFORE term.el sees the stream (bytes, not chars: term decodes UTF-8
+  ;; itself, so decoded chars would double-decode into mojibake).  Everything else,
+  ;; CSI included, passes through untouched.
+  (defconst my-term--dec-graphics-map
+    (mapcar (lambda (p) (cons (car p) (encode-coding-string (string (cdr p)) 'utf-8)))
+            '((?j . ?┘) (?k . ?┐) (?l . ?┌) (?m . ?└) (?n . ?┼)
+              (?q . ?─) (?t . ?├) (?u . ?┤) (?v . ?┴) (?w . ?┬) (?x . ?│)
+              (?a . ?▒) (?\` . ?◆) (?~ . ?·) (?0 . ?█)))
+    "VT100 DEC line-drawing byte -> UTF-8 bytes of the Unicode box char.")
+
+  (defun my-term--dec-translate (proc string)
+    "Rewrite DEC line-drawing (charset ESC(0..ESC(B) in STRING to Unicode box bytes.
+G0-graphics state and a held trailing ESC are kept on PROC across output chunks."
+    (let* ((s (concat (or (process-get proc 'dec-pending) "") string))
+           (n (length s)) (i 0)
+           (gfx (process-get proc 'dec-gfx))
+           (chunks nil) (held ""))
+      (while (< i n)
+        (let ((c (aref s i)))
+          (cond
+           ((= c ?\e)
+            (cond
+             ;; incomplete ESC / ESC( at chunk end -> hold for the next chunk
+             ((or (= (1+ i) n)
+                  (and (= (aref s (1+ i)) ?\() (= (+ i 2) n)))
+              (setq held (substring s i) i n))
+             ;; ESC ( X : charset designation (0 = graphics, else ASCII); drop it
+             ((= (aref s (1+ i)) ?\()
+              (setq gfx (= (aref s (+ i 2)) ?0) i (+ i 3)))
+             ;; other ESC sequence: emit ESC, let term.el handle the rest
+             (t (push "\e" chunks) (setq i (1+ i)))))
+           (t
+            (push (or (and gfx (cdr (assq c my-term--dec-graphics-map)))
+                      (string c))
+                  chunks)
+            (setq i (1+ i))))))
+      (process-put proc 'dec-pending held)
+      (process-put proc 'dec-gfx gfx)
+      (apply #'concat (nreverse chunks))))
+
   (defun my-ghostel-module-compile ()
     "Compile the ghostel native module in a term.el terminal.
 Drop-in override for `ghostel-module-compile' that renders zig's progress UI
@@ -2178,8 +2223,15 @@ build that produces the module).  Installed on success by ghostel's own
         ;; installer to find and move the freshly-built module.
         (setq-local ghostel--module-compile-build-dir build-dir
                     ghostel--module-compile-dest-dir dest-dir))
-      (set-process-sentinel (get-buffer-process buf)
-                            #'my-ghostel-module-build-sentinel)
+      (let* ((proc (get-buffer-process buf))
+             (term-filter (process-filter proc)))  ; term-emulate-terminal
+        ;; interpose the DEC-graphics translator ahead of term's own filter
+        (process-put proc 'dec-gfx nil)
+        (process-put proc 'dec-pending "")
+        (set-process-filter proc
+                            (lambda (p str)
+                              (funcall term-filter p (my-term--dec-translate p str))))
+        (set-process-sentinel proc #'my-ghostel-module-build-sentinel))
       (pop-to-buffer buf)))
 
   (advice-add 'ghostel-module-compile :override #'my-ghostel-module-compile))
