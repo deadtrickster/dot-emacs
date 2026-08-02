@@ -2119,12 +2119,63 @@ just gets a `<2>' suffix).  This is what makes save/restore match reliably."
   ;; ...but NEVER route ghostel's own native-module build through a ghostel
   ;; terminal.  That terminal is *rendered by the module* (`ghostel-compile--start'
   ;; calls `ghostel--load-module'), so building the module inside one is a bootstrap
-  ;; deadlock on a fresh install -- and it's the very buffer that shows raw zig
-  ;; progress escapes.  Keep it on stock compilation (grep-mode is excluded too, by
-  ;; the mode's own default).
+  ;; deadlock on a fresh install.  Excluded here; instead we render that one build in
+  ;; Emacs's built-in term.el emulator (see `my-ghostel-module-compile' below).
+  ;; grep-mode is excluded too, by the mode's own default.
   (add-to-list 'ghostel-compile-global-mode-excluded-modes
                'ghostel-module-compilation-mode)
-  (ghostel-compile-global-mode 1))
+  (ghostel-compile-global-mode 1)
+
+  ;; The one compile that can't use ghostel is ghostel's own native-module build.
+  ;; Render it in term.el instead: a full ANSI terminal emulator written in pure
+  ;; elisp -- no native module, so no bootstrap deadlock -- so zig's progress UI
+  ;; (which it draws on the controlling TTY with charset-switch + cursor-control
+  ;; escapes, bypassing stdout/stderr) renders correctly instead of dumping raw
+  ;; `^[(0'/`^[M' litter into a compilation buffer.  Everything else keeps going
+  ;; through ghostel-compile-global-mode above.  Reuses ghostel's own build-dir
+  ;; setup and its post-build installer (`...after-compilation', which reads the
+  ;; two permanent-local vars we stash and moves the built .so into place).
+  (defun my-ghostel-module-build-sentinel (proc event)
+    "Let term.el finish, then install the built module and lock the buffer."
+    (term-sentinel proc event)
+    (let ((buf (process-buffer proc)))
+      (when (buffer-live-p buf)
+        (ghostel--install-built-module-after-compilation buf event)
+        (with-current-buffer buf
+          (term-line-mode)                ; done building -> navigable, not a live TTY
+          (setq buffer-read-only t)))))
+
+  (defun my-ghostel-module-compile ()
+    "Compile the ghostel native module in a term.el terminal.
+Drop-in override for `ghostel-module-compile' that renders zig's progress UI
+correctly (term.el is a full ANSI emulator, and pure elisp -- safe for the very
+build that produces the module).  Installed on success by ghostel's own
+`ghostel--install-built-module-after-compilation'."
+    (interactive)
+    (require 'term)
+    (save-some-buffers (not compilation-ask-about-save)
+                       compilation-save-buffers-predicate)
+    (let* ((source-dir (ghostel--resource-root))
+           (dest-dir (ghostel--module-directory))
+           (build-dir (ghostel--make-module-build-dir dest-dir))
+           (cmd (format ghostel-module-compile-command
+                        (shell-quote-argument (expand-file-name build-dir))))
+           ;; make-term inherits the current buffer's dir; the build needs build.zig.
+           (buf (let ((default-directory source-dir))
+                  (make-term "ghostel-module-build" shell-file-name nil "-c" cmd))))
+      (with-current-buffer buf
+        (term-mode)
+        (term-char-mode)                  ; full emulation while output streams in
+        (setq-local default-directory source-dir)
+        ;; permanent-local (see the defvars) -> survive the mode setup; read by the
+        ;; installer to find and move the freshly-built module.
+        (setq-local ghostel--module-compile-build-dir build-dir
+                    ghostel--module-compile-dest-dir dest-dir))
+      (set-process-sentinel (get-buffer-process buf)
+                            #'my-ghostel-module-build-sentinel)
+      (pop-to-buffer buf)))
+
+  (advice-add 'ghostel-module-compile :override #'my-ghostel-module-compile))
 
 (use-package windmove
   :config
