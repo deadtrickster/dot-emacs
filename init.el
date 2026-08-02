@@ -2106,7 +2106,25 @@ just gets a `<2>' suffix).  This is what makes save/restore match reliably."
   ;; a fresh grouped-view buffer instead.  (C-x is in `ghostel-keymap-exceptions',
   ;; so it reaches Emacs.)  C-x 1 / C-x 0 stay stock (window ops, not closes).
   (define-key ghostel-mode-map (kbd "C-x 3") #'my-ghostel-split-view-right)
-  (define-key ghostel-mode-map (kbd "C-x 2") #'my-ghostel-split-view-below))
+  (define-key ghostel-mode-map (kbd "C-x 2") #'my-ghostel-split-view-below)
+
+  ;; Route every `compile' / `compilation-start' through a real ghostel terminal:
+  ;; the output is a proper terminal (colors, cursor moves, TUI progress -- e.g.
+  ;; zig's build tree -- all render), and on finish it finalizes to the requested
+  ;; compilation-mode subclass so `next-error' and clickable file:line still work.
+  ;; This is the "print lines properly AND handle the escape sequences" answer that
+  ;; plain compilation-mode (a static log) and a bare ansi-term (no error nav) each
+  ;; only half-solve.
+  (require 'ghostel-compile)
+  ;; ...but NEVER route ghostel's own native-module build through a ghostel
+  ;; terminal.  That terminal is *rendered by the module* (`ghostel-compile--start'
+  ;; calls `ghostel--load-module'), so building the module inside one is a bootstrap
+  ;; deadlock on a fresh install -- and it's the very buffer that shows raw zig
+  ;; progress escapes.  Keep it on stock compilation (grep-mode is excluded too, by
+  ;; the mode's own default).
+  (add-to-list 'ghostel-compile-global-mode-excluded-modes
+               'ghostel-module-compilation-mode)
+  (ghostel-compile-global-mode 1))
 
 (use-package windmove
   :config
