@@ -867,6 +867,20 @@ each time.  So the listing draws immediately and the column lands a moment later
   (xterm-tmux-extra-capabilities '(modifyOtherKeys setSelection))
   (xterm-screen-extra-capabilities '(modifyOtherKeys setSelection))
 
+  :custom-face
+  ;; --- tty menus ---
+  ;; The mode line is full of click targets (major mode, minor modes, flymake's
+  ;; counters, eglot, the narrowing indicator), and on a tty a click on one pops
+  ;; Emacs's own text-mode menu rather than a toolkit one.  Nobody ever saw these
+  ;; faces here before, because without a mouse there was no way to open a menu
+  ;; in the first place — `xterm-mouse-mode' above is what makes them reachable.
+  ;; Their defaults are untouched DOS: yellow on blue, with a red selection bar.
+  ;; Repaint them in the mode line's own palette (see `my-tune-mode-line-faces'),
+  ;; so a menu reads as part of this config instead of a 1990s artifact.
+  (tty-menu-enabled-face  ((t (:background "#2a2f3d" :foreground "#c5ccd8"))))
+  (tty-menu-disabled-face ((t (:background "#2a2f3d" :foreground "#5e6573"))))
+  (tty-menu-selected-face ((t (:background "#44506b" :foreground "#e3e7ee"))))
+
   ;; --- bell ---
   ;; `visible-bell' (set in the `simple' block) is a good trade on a GUI frame:
   ;; it replaced the KDE system beep that fires on every `C-g'.  On a tty it is
