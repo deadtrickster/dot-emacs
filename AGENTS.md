@@ -111,6 +111,25 @@ New features go on a clean branch on top of trunk (`master`):
   views are excluded from session-restore. `C-t` tab launchers switch *that
   view's* tab; `C-t C-t` returns to your code (or the project's dired).
 
+## Emacs in a terminal / over ssh
+
+- **One Emacs owns the session.** The instance that binds the server socket sets
+  `my-emacs-primary-p`, and only it restores the session snapshot at startup and
+  writes it on exit. Every other Emacs is stateless. So the way to preserve your
+  layout is simply **start the GUI Emacs first** — every later `emacs -nw` is
+  then a secondary and cannot touch it.
+- **`EMACS_NO_RESTORE=1 emacs -nw`** for the case that rule can't cover: no GUI
+  to be secondary to (ssh'd in from another machine, or just after a crash).
+  Skips restore *and* save, leaving the snapshot for the next real start.
+- **`etty`** opens a tty frame of the *running* Emacs (`emacsclient -nw -a ''`),
+  so buffers, kill ring, ghostel terminals and the `e*` bridge are the ones you
+  are sitting in. Prefer it over a second `emacs -nw` when an Emacs is up.
+- tty frames get the clipboard (OSC 52 — `setSelection` had to be declared,
+  `term/tmux.el` skips xterm's probe), `xterm-mouse-mode`, a silent bell, and
+  themed `tty-menu-*` faces. ghostel terminals render fine in a tty frame.
+- Color is 24-bit here off `COLORTERM`, not `TERM`, so theme hex values render
+  exactly through byobu — don't "fix" this by chasing a `*-direct` terminfo.
+
 ## Gotchas
 
 - tmux session names can't contain `.`/`:` (silently rewritten to `_`). Set

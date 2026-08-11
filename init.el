@@ -1084,6 +1084,24 @@ is understood on the way back in, see `server-visit-files')."
     (expand-file-name ".restart-state.log" user-emacs-directory)
     "Where the last session-restore records what it did (for debugging).")
 
+  (defun my-restart--opted-out-p ()
+    "Non-nil when $EMACS_NO_RESTORE asks this Emacs to leave the session alone.
+
+The escape hatch for `EMACS_NO_RESTORE=1 emacs -nw': a scratch editor that must
+not touch the saved layout.  Normally the discipline is simply to start the GUI
+Emacs first -- it takes the server socket, so every later `emacs -nw' is a
+secondary and is already stateless (see `my-emacs-primary-p').  This is for when
+there is no GUI to start first: ssh'd in from another machine, or straight after
+a crash, where the terminal Emacs WOULD be the primary and would otherwise
+restore the whole desktop session into a terminal pane and rewrite the snapshot
+on exit.
+
+Suppresses BOTH halves -- no restore, and no save -- which is the point: the
+snapshot is left exactly as it was, still waiting for the next real Emacs.
+Accepts anything but the empty string and \"0\", so `=1' / `=yes' both work."
+    (let ((v (getenv "EMACS_NO_RESTORE")))
+      (and v (not (string-empty-p v)) (not (string= v "0")))))
+
   (defun my-restart--log (fmt &rest args)
     "Append a line to `my-restart--log-file' (never signals)."
     (ignore-errors
@@ -1274,7 +1292,12 @@ buffers, window layout, and project terminals."
   ;; `e*' bridge and `C-t' terminals actually talk to.  A secondary `emacs -nw'
   ;; is simply stateless -- it saves nothing and restores nothing, which is what
   ;; you want from a throwaway editor in a terminal.
-  (when (and (not noninteractive) my-emacs-primary-p)
+  ;;
+  ;; `my-restart--opted-out-p' ($EMACS_NO_RESTORE) is the manual override for the
+  ;; one case ownership cannot decide for you: no GUI Emacs to be secondary TO.
+  (when (and (not noninteractive)
+             my-emacs-primary-p
+             (not (my-restart--opted-out-p)))
     (add-hook 'emacs-startup-hook #'my-restart--maybe-restore)
     ;; First half: snapshot on every exit so a plain `C-x C-c' / laptop shutdown
     ;; comes back next launch (the startup hook restores + consumes the file).
