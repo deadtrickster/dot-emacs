@@ -298,7 +298,9 @@ retro-fixes one that streamed in uncolored."
   :custom
   (blink-cursor-mode nil)
   ;; Flash the frame instead of the audible bell (KDE now plays the system beep
-  ;; on every C-g / quit, which the old X setup swallowed).
+  ;; on every C-g / quit, which the old X setup swallowed).  Graphical frames
+  ;; only -- on a tty the flash is a full-screen repaint, so `ring-bell-function'
+  ;; (in the tty block) gates it on `display-graphic-p'.
   (visible-bell t)
   (delete-selection-mode t)
   (column-number-mode t)
@@ -827,6 +829,99 @@ each time.  So the listing draws immediately and the column lands a moment later
                              :box (:line-width (1 . 3) :color "#737687"
                                    :style flat-button) :weight bold :height 1.0)))))
 
+;; ---------------------------------------------------------------------------
+;; Terminal (tty) frames — `etty' / `emacsclient -nw', typically over ssh.
+;; ---------------------------------------------------------------------------
+;; A tty frame gets none of what the window system hands a graphical one for
+;; free: the clipboard, the mouse, and the bell all have to be negotiated with
+;; the terminal over the wire.  Emacs can do all three, but under tmux it does
+;; not switch them on by itself.  Everything below is applied PER TERMINAL from
+;; `tty-setup-hook' or keyed on `display-graphic-p', so attaching a tty frame
+;; never changes how the desktop frame behaves — the two coexist in one Emacs.
+(use-package emacs
+  :ensure nil
+  :custom
+  ;; --- clipboard over ssh (OSC 52) ---
+  ;; Emacs already knows how to publish a selection to the terminal as
+  ;; `ESC ] 52 ; c ; <base64> BEL' — but only for a terminal flagged
+  ;; `setSelection', and under tmux nothing ever sets that flag.  Plain
+  ;; `terminal-init-xterm' would find it: with `xterm-extra-capabilities' at its
+  ;; default `check' it sends a primary-DA query and enables OSC 52 from the
+  ;; reply.  But `terminal-init-tmux' (and `-screen') deliberately SKIP that
+  ;; probe — the surrounding emulator can change mid-session (bug#20356) — and
+  ;; substitute a hard-coded `(modifyOtherKeys)'.  So inside byobu, `M-w' called
+  ;; `gui-select-text' and put nothing on the wire, and the kill never reached
+  ;; the clipboard of the machine you are ssh'd in FROM.  (Confirmed by piping
+  ;; the raw pty through `cat': zero OSC 52 sequences.)
+  ;;
+  ;; The probe is the wrong tool here anyway — the thing that would answer it is
+  ;; tmux, not the terminal that ends up owning the clipboard.  Declare the
+  ;; capability instead.  tmux relays it: `set-clipboard on' and the
+  ;; `:clipboard' terminal-feature are already in byobu/.tmux.conf.
+  ;;
+  ;; setSelection only, never `getSelection': that makes Emacs QUERY the
+  ;; terminal for the clipboard on every yank, and terminals overwhelmingly
+  ;; refuse to answer (reading it back is the half of OSC 52 that leaks data
+  ;; between panes), so yank would stall waiting for a reply that never comes.
+  ;; Yank keeps reading the internal kill ring, which is what you want.
+  (xterm-tmux-extra-capabilities '(modifyOtherKeys setSelection))
+  (xterm-screen-extra-capabilities '(modifyOtherKeys setSelection))
+
+  ;; --- bell ---
+  ;; `visible-bell' (set in the `simple' block) is a good trade on a GUI frame:
+  ;; it replaced the KDE system beep that fires on every `C-g'.  On a tty it is
+  ;; a whole-screen inverse flash — over ssh, a full repaint of every cell, on
+  ;; every quit.  `visible-bell' is not frame-local, so branch in the bell
+  ;; itself: flash on a graphical frame, stay silent on a terminal one.
+  (ring-bell-function
+   (lambda ()
+     (when (display-graphic-p)
+       ;; Rebinding to nil is what lets us invoke the REAL bell without
+       ;; re-entering this function.
+       (let ((ring-bell-function nil))
+         (ding t)))))
+
+  :config
+  (defun my-tty-setup ()
+    "Per-terminal setup for a tty frame.  On `tty-setup-hook'."
+    ;; Mouse in the terminal: click to place point, drag to select, wheel to
+    ;; scroll.  Emacs asks the terminal for mouse reports, so from here on the
+    ;; mouse belongs to Emacs, not to tmux or the outer terminal — a drag makes
+    ;; an Emacs region rather than a terminal selection.  Hold SHIFT to bypass
+    ;; Emacs and get the terminal's own selection back (that is the terminal's
+    ;; convention, not ours), which is still the way to copy with the mouse to
+    ;; an app that does not speak OSC 52.
+    (xterm-mouse-mode 1))
+
+  (defun my-save-buffers-kill-terminal (&optional arg)
+    "Close this TERMINAL, and quit Emacs only when it is the last one.
+
+Stock `C-x C-c' (`save-buffers-kill-terminal') branches on exactly one thing:
+a frame with a `client' parameter closes just that client, and ANY other frame
+falls through to `save-buffers-kill-emacs' and takes the whole process down.
+That is right for a standalone `emacs -nw' (its terminal IS Emacs), and right
+for an `etty' frame (it has a client).  It is wrong for a tty frame opened any
+other way -- `make-frame-on-tty' -- where a reflexive `C-x C-c' would close the
+terminal you are looking at AND every desktop frame behind it.
+
+So: more than one terminal means `C-x C-c' closes only the one you are on.  One
+terminal means what it always meant.  Note this deliberately counts TERMINALS,
+not frames -- two GUI frames share one terminal, so `C-x C-c' there still quits
+Emacs as before."
+    (interactive "P")
+    (if (or (frame-parameter nil 'client)
+            (null (cdr (terminal-list))))
+        (save-buffers-kill-terminal arg)
+      (save-some-buffers arg t)
+      (delete-frame)))
+  (global-set-key (kbd "C-x C-c") #'my-save-buffers-kill-terminal)
+
+  ;; Fires once per terminal, and late enough in both launch paths to be the
+  ;; only hook needed: `startup.el' runs `tty-run-terminal-initialization' for
+  ;; `emacs -nw' AFTER the init file is loaded, and a frame made later by
+  ;; `emacsclient -nw' initializes its own terminal when it is created.
+  (add-hook 'tty-setup-hook #'my-tty-setup))
+
 (use-package exec-path-from-shell
   :config
   (when (memq window-system '(mac ns x))
@@ -857,15 +952,35 @@ each time.  So the listing draws immediately and the column lands a moment later
   ;; already in use".  use-package catches it, and you're left with no server at
   ;; all: emacsclient, ecommit, eopen and ebuffer all dead until you restart.
   ;; Delete the corpse socket first.  The `unless' still protects a server that is
-  ;; genuinely alive in ANOTHER Emacs (`server-running-p' returns `:other' there,
-  ;; which is non-nil, so we never touch it).
+  ;; genuinely alive in ANOTHER Emacs: over a unix socket `server-running-p' just
+  ;; tries to CONNECT, so it answers t for any listener, ours or not, and we never
+  ;; touch it.  (Its docstring's third value, `:other', is the `server-use-tcp'
+  ;; case only -- there is no such distinction here, and none is needed: the point
+  ;; is only "is anyone listening".)  So a second Emacs -- `emacs -nw' in a byobu
+  ;; tab, say -- cannot take the socket from the desktop one; it simply runs
+  ;; without a server, and every `e*' bridge keeps talking to the primary.
   ;; Never in batch: the headless smoke test loads this config, and a batch Emacs
   ;; must not `server-force-delete' (it could remove the socket of the REAL Emacs
   ;; you have running) nor `server-start' (it would exit and leave a stale socket
   ;; behind -- recreating the very bug this block exists to fix).
+  (defvar my-emacs-primary-p nil
+    "Non-nil in the Emacs instance that OWNS the `server' socket.
+
+Exactly one Emacs per user can hold it, and that one is the whole setup's
+singleton: `emacsclient', and every `e*' bridge script built on it (eopen,
+ecommit, esh, etab, ebuffer, ediff-review) talk to it and nothing else.  So it
+is also the right owner of the single-writer session snapshot -- see the
+`my-restart--save-state' block below, which would otherwise let a throwaway
+`emacs -nw' overwrite the desktop Emacs's saved layout on exit.
+
+Stays nil in batch (the headless smoke test) and in any secondary instance.")
+
   (unless (or noninteractive (server-running-p))
     (server-force-delete)
-    (server-start)))
+    (server-start)
+    ;; Only reached if `server-start' actually bound the socket -- it signals on
+    ;; failure, and use-package catches that, leaving this nil.
+    (setq my-emacs-primary-p t)))
 
 ;; `emacsclient foo.c:123:4' -> open foo.c and go to 123:4.
 ;;
@@ -1092,8 +1207,13 @@ buffers, window layout, and project terminals."
               (let ((default-directory term))
                 (ignore-errors (my-project-tab "shell"))))))
           ;; 3. restore frame geometry (window-state covers only the inner
-          ;;    layout, not the frame's own size/position/maximized state)
-          (ignore-errors
+          ;;    layout, not the frame's own size/position/maximized state).
+          ;;    Graphical frames only: a tty frame's size is the terminal's, and
+          ;;    `left'/`top'/`fullscreen' mean nothing there -- forcing a saved
+          ;;    GUI width/height onto it would just desync Emacs from the real
+          ;;    pane until the next resize.
+          (when (display-graphic-p)
+           (ignore-errors
             (let* ((fp (plist-get data :frame))
                    (fs (alist-get 'fullscreen fp)))
               (if fs
@@ -1103,7 +1223,7 @@ buffers, window layout, and project terminals."
                  (list (cons 'width  (alist-get 'width fp))
                        (cons 'height (alist-get 'height fp))
                        (cons 'left   (alist-get 'left fp))
-                       (cons 'top    (alist-get 'top fp)))))))
+                       (cons 'top    (alist-get 'top fp))))))))
           ;; 4. apply the window layout on a short timer -- AFTER the dashboard,
           ;;    the ghostel terminal display, and any other startup reflow have
           ;;    run, and after slow buffers settle, so our layout is the final
@@ -1117,12 +1237,30 @@ buffers, window layout, and project terminals."
                                 (mapcar (lambda (w) (buffer-name (window-buffer w)))
                                         (window-list))))))))))
   :config
-  ;; NOT in batch.  The headless smoke test (AGENTS.md) LOADS this config, and a
-  ;; batch Emacs exits immediately -- which would fire `kill-emacs-hook' and
-  ;; overwrite the real session snapshot with the batch session's (empty) state,
-  ;; destroying it.  The restore side is equally unwanted headless: it would
-  ;; reopen files and respawn project terminals.
-  (unless noninteractive
+  ;; PRIMARY INSTANCE ONLY -- the one holding the server socket
+  ;; (`my-emacs-primary-p', set in the `server' block above).  The snapshot is a
+  ;; single file with a single writer, and two things would otherwise fight over
+  ;; it:
+  ;;
+  ;;   * Batch.  The headless smoke test (AGENTS.md) LOADS this config, and a
+  ;;     batch Emacs exits immediately -- firing `kill-emacs-hook' and
+  ;;     overwriting the real snapshot with the batch session's (empty) state.
+  ;;     The restore side is equally unwanted headless: it would reopen files and
+  ;;     respawn project terminals.
+  ;;   * A SECOND Emacs.  `emacs -nw' in a byobu tab (over ssh, say) is a full
+  ;;     interactive Emacs, so `noninteractive' does not catch it.  Quitting it
+  ;;     with `C-x C-c' wrote ITS two-buffer session over the desktop Emacs's
+  ;;     saved layout, and the desktop Emacs then restored that on its next
+  ;;     start -- losing the real one.  It would also have raced to RESTORE the
+  ;;     snapshot at startup, consuming (deleting) the file and respawning the
+  ;;     project terminals in the wrong instance.
+  ;;
+  ;; Owning both halves to the server-holding instance covers both cases with one
+  ;; condition, and picks the right owner by construction: that is the Emacs the
+  ;; `e*' bridge and `C-t' terminals actually talk to.  A secondary `emacs -nw'
+  ;; is simply stateless -- it saves nothing and restores nothing, which is what
+  ;; you want from a throwaway editor in a terminal.
+  (when (and (not noninteractive) my-emacs-primary-p)
     (add-hook 'emacs-startup-hook #'my-restart--maybe-restore)
     ;; First half: snapshot on every exit so a plain `C-x C-c' / laptop shutdown
     ;; comes back next launch (the startup hook restores + consumes the file).
@@ -1159,7 +1297,7 @@ buffers, window layout, and project terminals."
     (let ((bin-src (expand-file-name "shell/bin" repo))
           (bin-dst (expand-file-name "~/.local/bin")))
       (dolist (f '("eopen" "esay" "enotify" "ecommit" "ebuffer" "esh" "etab"
-                   "ediff-review" "oriole-pgindent" "oriole-yapf"))
+                   "etty" "ediff-review" "oriole-pgindent" "oriole-yapf"))
         (let ((src (expand-file-name f bin-src))
               (dst (expand-file-name f bin-dst)))
           (when (file-exists-p src)

@@ -12,7 +12,7 @@ up the rest.
 | `early-init.el` | Pre-package init. **Only** MELPA registration — must live here (runs before `package-initialize`). |
 | `init.el` | The entire Emacs config, `use-package`-based throughout. |
 | `shell/integration.bash` | Vendored shell integration: `bb`/`bb-reset`, ghostel/`emacsclient` helpers, direnv hook, git-prompt. Sourced by `~/.bashrc`. |
-| `shell/bin/*` | Vendored standalone helper scripts symlinked onto PATH (`~/.local/bin`) by the installer so Claude's non-interactive shell can run them: the `e*` Emacs bridge (`eopen`, `esay`, `enotify`, `ecommit`, `ebuffer`, `esh`, `etab`, `ediff-review`) + the `oriole-*` formatters. |
+| `shell/bin/*` | Vendored standalone helper scripts symlinked onto PATH (`~/.local/bin`) by the installer so Claude's non-interactive shell can run them: the `e*` Emacs bridge (`eopen`, `esay`, `enotify`, `ecommit`, `ebuffer`, `esh`, `etab`, `etty`, `ediff-review`) + the `oriole-*` formatters. |
 | `byobu/{status,.tmux.conf,bin/bb-save-layout}` | Vendored byobu config; symlinked into `~/.config/byobu/`. |
 | `claude/{inside-emacs.md,hooks/inside-emacs-context}` | Vendored "Claude is running inside Emacs" context overlay + its `SessionStart` hook; symlinked into `~/.claude/` and registered in `~/.claude/settings.json`. |
 | `bin/check` | The test suite: elisp parens + a full headless load of the config, then `bash -n`/`shellcheck` over every vendored script. Run before committing. |

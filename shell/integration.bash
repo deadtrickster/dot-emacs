@@ -308,8 +308,27 @@ if [[ "${INSIDE_EMACS%%,*}" = 'ghostel' || "$TERM" = 'xterm-ghostty' ]]; then
         # Interactive shortcuts -> the vendored `eopen' script (one impl, shared
         # with Claude; `my-ensure-shell-integration' puts it on PATH).
         e() { eopen "$@"; }
-        emacs() { eopen "$@"; }
         open() { eopen "$@"; }
+
+        # `emacs' is the same shortcut, but ONLY for a plain list of files.  Any
+        # option means you asked for a real Emacs process -- most of all `-nw',
+        # a terminal Emacs in this pane (the natural thing over ssh, where there
+        # may be no outer Emacs at all).  Without this, `emacs -nw' ran
+        # `eopen -nw', which realpath'd the flag into `$PWD/-nw' and opened THAT
+        # bogus file in the outer Emacs: nothing came up here, and you got a junk
+        # buffer over there.
+        emacs() {
+            local arg
+            for arg in "$@"; do
+                case "$arg" in
+                    -*)
+                        command emacs "$@"
+                        return
+                        ;;
+                esac
+            done
+            eopen "$@"
+        }
     fi
 
     # Directory tracking (OSC 7).  Only needed inside tmux/byobu, passthrough-wrapped.

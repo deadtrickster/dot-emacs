@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Open a TTY frame of the running Emacs in THIS terminal -- the ssh/terminal
+# counterpart of `eopen'.  You get the same buffers, kill ring, ghostel
+# terminals and `C-t' bindings as the desktop frame, and the `e*' bridge
+# (eopen, ecommit, esh, etab, ebuffer) points back at the Emacs you are sitting
+# in rather than at some other instance.
+#
+# `-a ""' is the ssh case: if no Emacs is running on this host, emacsclient
+# starts a daemon and attaches to that, instead of failing.  On a machine that
+# already has an Emacs (the desktop) it never fires.
+#
+# Any arguments are files to visit in the new frame; `path:LINE[:COL]' works,
+# server.el's arg rewriting is in init.el.  `C-x 5 0' deletes the frame and
+# returns you to the shell, leaving the rest of Emacs running -- with file
+# arguments the client blocks, so `C-x #' ("done with this buffer") does the
+# same and is what Emacs prompts you with.
+#
+# Vendored here; symlinked onto PATH (~/.local/bin) by
+# `my-ensure-shell-integration'.
+set -euo pipefail
+exec emacsclient -nw -a '' -- "$@"
