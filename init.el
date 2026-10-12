@@ -309,6 +309,20 @@ retro-fixes one that streamed in uncolored."
   ;; so the GUI frame and the terminal it sits beside are one surface (the
   ;; font, Hack, comes from there too).  It was the built-in `deeper-blue',
   ;; whose palette had nothing to do with the terminal's.
+  ;;
+  ;; Trust it BEFORE enabling it (`:custom' sets in order).  A non-built-in theme
+  ;; is code, so `load-theme' asks first, and "always" records the file's hash in
+  ;; `custom-safe-themes' -- via `custom-file', which is a throwaway temp here, so
+  ;; the answer was lost and the question came back on every start.  Trusted is
+  ;; exactly this repo's file, by the same sha256 `load-theme' computes, so an
+  ;; edited theme is trusted on its next start while any other theme still asks.
+  (custom-safe-themes
+   (cons 'default
+         (let ((f (expand-file-name "letibot-gray-theme.el" user-emacs-directory)))
+           (when (file-readable-p f)
+             (with-temp-buffer
+               (insert-file-contents f)
+               (list (secure-hash 'sha256 (current-buffer))))))))
   (custom-enabled-themes '(letibot-gray)))
 
 (use-package dired
