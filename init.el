@@ -867,6 +867,32 @@ each time.  So the listing draws immediately and the column lands a moment later
   (xterm-tmux-extra-capabilities '(modifyOtherKeys setSelection))
   (xterm-screen-extra-capabilities '(modifyOtherKeys setSelection))
 
+  ;; --- bell ---
+  ;; `visible-bell' (set in the `simple' block) is a good trade on a GUI frame:
+  ;; it replaced the KDE system beep that fires on every `C-g'.  On a tty it is
+  ;; a whole-screen inverse flash — over ssh, a full repaint of every cell, on
+  ;; every quit.  `visible-bell' is not frame-local, so branch in the bell
+  ;; itself: flash on a graphical frame, stay silent on a terminal one.
+  ;;
+  ;; This is a `:custom', not a `:custom-face' — it is a VARIABLE holding a
+  ;; FUNCTION.  It used to sit below, inside `:custom-face', where `face-spec-set'
+  ;; got it as a face spec and signalled `wrong-type-argument listp lambda'.  That
+  ;; error is raised while the block is still expanding its `:custom-face' forms,
+  ;; so it ALSO took this block's `:config' with it: `my-tty-setup' was never
+  ;; defined (so `xterm-mouse-mode' never came on in a tty frame) and the
+  ;; `C-x C-c' rebinding below never happened — both of the things the tty
+  ;; commits claim to do, silently dead in every Emacs.  use-package reports it as
+  ;; "Error (use-package): emacs/:catch: ..." and then CARRIES ON, so nothing
+  ;; failed a test: ./bin/check stayed green (it now greps the load log for
+  ;; exactly that line).
+  (ring-bell-function
+   (lambda ()
+     (when (display-graphic-p)
+       ;; Rebinding to nil is what lets us invoke the REAL bell without
+       ;; re-entering this function.
+       (let ((ring-bell-function nil))
+         (ding t)))))
+
   :custom-face
   ;; --- tty menus ---
   ;; The mode line is full of click targets (major mode, minor modes, flymake's
@@ -880,20 +906,6 @@ each time.  So the listing draws immediately and the column lands a moment later
   (tty-menu-enabled-face  ((t (:background "#2a2f3d" :foreground "#c5ccd8"))))
   (tty-menu-disabled-face ((t (:background "#2a2f3d" :foreground "#5e6573"))))
   (tty-menu-selected-face ((t (:background "#44506b" :foreground "#e3e7ee"))))
-
-  ;; --- bell ---
-  ;; `visible-bell' (set in the `simple' block) is a good trade on a GUI frame:
-  ;; it replaced the KDE system beep that fires on every `C-g'.  On a tty it is
-  ;; a whole-screen inverse flash — over ssh, a full repaint of every cell, on
-  ;; every quit.  `visible-bell' is not frame-local, so branch in the bell
-  ;; itself: flash on a graphical frame, stay silent on a terminal one.
-  (ring-bell-function
-   (lambda ()
-     (when (display-graphic-p)
-       ;; Rebinding to nil is what lets us invoke the REAL bell without
-       ;; re-entering this function.
-       (let ((ring-bell-function nil))
-         (ding t)))))
 
   :config
   (defun my-tty-setup ()
