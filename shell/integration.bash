@@ -4,12 +4,19 @@
 # integration' in init.el, which also symlinks the byobu config below).  Keep
 # this self-contained and idempotent so it can be sourced from any interactive
 # bash.  Everything here is version-controlled in the .emacs.d repo.
+#
+# KEEP IN SYNC WITH shell/integration.zsh -- the same integration for zsh, which is
+# the login shell on macOS (and therefore the shell ghostel spawns there).
 
 # mise: polyglot runtime/tool version manager (node, erlang, elixir, ...).
 # Activation puts mise-managed tool shims on PATH and enables per-project
 # version switching (mise.toml / .tool-versions), much like direnv does for env.
-if [ -x "$HOME/.local/bin/mise" ]; then
-    eval "$("$HOME/.local/bin/mise" activate bash)"
+# Ask PATH instead of hard-coding ~/.local/bin: that is where mise lands on Linux,
+# but brew puts it in /opt/homebrew/bin, and the hard-coded test then silently
+# skipped activation on a Mac.  MISE_SHELL means an enclosing shell already
+# activated it -- activating twice stacks a second hook.
+if [ -z "${MISE_SHELL:-}" ] && command -v mise >/dev/null 2>&1; then
+    eval "$(mise activate bash)"
 fi
 
 # direnv: load each project's .envrc on `cd', so the byobu tabs get the same
@@ -107,9 +114,9 @@ export BYOBU_CONFIG_DIR="$HOME/.config/byobu"
 # Default tabs for a brand-new project session, and the command each starts with
 # (empty = just a shell).  On restore, only these known names get their command
 # re-run; any custom tab you added comes back as a plain shell.
-__BB_DEFAULT_WINDOWS=(claude shell git test)
+__BB_DEFAULT_WINDOWS=(leticode shell git test)
 declare -A __BB_WINDOW_CMD=(
-    [claude]='claude --continue || claude'
+    [leticode]='leticode --continue || leticode'
     [git]='git status'
 )
 
@@ -306,7 +313,7 @@ if [[ "${INSIDE_EMACS%%,*}" = 'ghostel' || "$TERM" = 'xterm-ghostty' ]]; then
         export GIT_SEQUENCE_EDITOR='emacsclient'
 
         # Interactive shortcuts -> the vendored `eopen' script (one impl, shared
-        # with Claude; `my-ensure-shell-integration' puts it on PATH).
+        # with the assistant; `my-ensure-shell-integration' puts it on PATH).
         e() { eopen "$@"; }
         open() { eopen "$@"; }
 
@@ -362,8 +369,8 @@ if [[ "${INSIDE_EMACS%%,*}" = 'ghostel' || "$TERM" = 'xterm-ghostty' ]]; then
         # Target THIS shell's own pane ($TMUX_PANE), not a bare `display-message':
         # without -t, tmux reports the CLIENT's ACTIVE window, not the window this
         # shell runs in.  During `bb''s rapid window creation the shells all source
-        # this rc while one window (claude) is active, so every one of them would key
-        # its history to `__claude' and cross-contaminate.  -t "$TMUX_PANE" pins it
+        # this rc while one window (leticode) is active, so every one of them would key
+        # its history to `__leticode' and cross-contaminate.  -t "$TMUX_PANE" pins it
         # to the pane's own window regardless of what's focused.
         __bb_hist_key=$(tmux display-message -t "$TMUX_PANE" -p '#{session_name}__#{window_name}' \
             2>/dev/null | tr -d '\n' | tr -c 'A-Za-z0-9_.-' '_')

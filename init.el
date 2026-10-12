@@ -158,7 +158,7 @@ dimmed envrc `none' (inactive windows dimmer than active)."
   (add-hook 'emacs-startup-hook #'my-tune-mode-line-faces)
   (add-hook 'enable-theme-functions #'my-tune-mode-line-faces)
   ;; C-t is a prefix map (set up in the `projectile' block): C-t C-t = byobu
-  ;; terminal, C-t C-c = claude.  Each toggles, so the same chord returns you.
+  ;; terminal, C-t C-c = leticode.  Each toggles, so the same chord returns you.
   (global-set-key (kbd "<home>") 'beginning-of-line)
   (global-set-key (kbd "<end>") 'end-of-line)
   (global-set-key "\C-cc" 'comment-or-uncomment-region)
@@ -1011,7 +1011,7 @@ Stays nil in batch (the headless smoke test) and in any secondary instance.")
 ;; `emacsclient foo.c:123:4' -> open foo.c and go to 123:4.
 ;;
 ;; Everything in a byobu tab speaks `path:line:col': rg, grep, gcc, a Python
-;; traceback, a Claude code reference.  With $EDITOR=emacsclient the natural move
+;; traceback, a leticode reference.  With $EDITOR=emacsclient the natural move
 ;; is to paste one straight back -- and stock Emacs then creates a NEW, empty file
 ;; literally named `foo.c:123:4'.  (emacsclient does have +LINE:COL, but that is
 ;; not the shape the tools print, and you'd have to hand-edit every paste.)
@@ -1048,7 +1048,7 @@ file honestly named with a colon still opens as itself."
 
 ;; The other half of the loop above: PRODUCE a `path:line:col' for where you are.
 ;; That string is the unit of exchange with everything outside Emacs -- paste it
-;; into a Claude prompt, an `rg' follow-up, `git blame -L', a bug report.  Bound on
+;; into a leticode prompt, an `rg' follow-up, `git blame -L', a bug report.  Bound on
 ;; the C-t map next to the other hand-it-to-the-terminal commands (C-t C-y cites a
 ;; region, C-t C-b cites a buffer), so: C-t C-w.
 (use-package emacs
@@ -1316,32 +1316,47 @@ buffers, window layout, and project terminals."
     (add-hook 'kill-emacs-hook #'my-restart--save-state)))
 
 ;; Monorepo self-install: this .emacs.d repo also vendors the shell + byobu
-;; integration (shell/integration.bash, byobu/*).  Ensure, idempotently at
-;; startup, that ~/.bashrc sources the snippet and that the vendored byobu files
-;; are symlinked into ~/.config/byobu — so a fresh clone wires itself up.
+;; integration (shell/integration.bash + shell/integration.zsh, byobu/*).  Ensure,
+;; idempotently at startup, that each shell's rc sources its snippet and that the
+;; vendored byobu files are symlinked into ~/.config/byobu — so a fresh clone
+;; wires itself up.
 (defun my-ensure-shell-integration ()
-  "Wire this repo's shell/byobu integration into ~/.bashrc and ~/.config/byobu."
+  "Wire this repo's shell/byobu integration into ~/.bashrc, ~/.zshrc, ~/.config/byobu."
   (let* ((repo  (expand-file-name user-emacs-directory))
-         (integ (expand-file-name "shell/integration.bash" repo))
-         (bashrc (expand-file-name "~/.bashrc"))
          (begin "# >>> emacs-managed shell integration >>>")
          (end   "# <<< emacs-managed shell integration <<<"))
-    ;; 1. Make ~/.bashrc source the vendored integration (append the block once).
-    (when (file-exists-p integ)
-      (let ((content (and (file-readable-p bashrc)
-                          (with-temp-buffer (insert-file-contents bashrc)
-                                            (buffer-string)))))
-        (unless (and content (string-search begin content))
-          (with-temp-buffer
-            (when content (insert content) (unless (bolp) (insert "\n")))
-            (insert "\n" begin "\n"
-                    (format "[ -r %s ] && . %s\n"
-                            (shell-quote-argument integ)
-                            (shell-quote-argument integ))
-                    end "\n")
-            (write-region (point-min) (point-max) bashrc)))))
-    ;; 1b. Symlink the vendored Claude/Emacs helper scripts onto PATH so a
-    ;;     non-interactive shell (Claude's Bash tool) can run them, and ensure
+    ;; 1. Make each shell's rc source ITS integration (append the block once).
+    ;;    BOTH shells, because either one can be the shell a terminal runs:
+    ;;    ghostel spawns `$SHELL', which is bash on the Linux box and zsh on the
+    ;;    Mac, and the two files are the same integration in each language -- so a
+    ;;    machine that only ever runs one of them is not harmed by the other's rc
+    ;;    (the block is inert unless that shell starts).  ~/.bashrc is created even
+    ;;    when absent, because a NON-interactive shell (the assistant's Bash tool)
+    ;;    reads it and nothing else.  ~/.zshrc is only created where zsh actually
+    ;;    exists, so this does not litter a bash-only machine with an rc that no
+    ;;    shell would ever read.
+    (dolist (pair '(("~/.bashrc" . "shell/integration.bash")
+                    ("~/.zshrc"   . "shell/integration.zsh")))
+      (let ((rc (expand-file-name (car pair)))
+            (integ (expand-file-name (cdr pair) repo)))
+        (when (and (file-exists-p integ)
+                   (or (file-exists-p rc)
+                       (string= (car pair) "~/.bashrc")
+                       (executable-find "zsh")))
+          (let ((content (and (file-readable-p rc)
+                              (with-temp-buffer (insert-file-contents rc)
+                                                (buffer-string)))))
+            (unless (and content (string-search begin content))
+              (with-temp-buffer
+                (when content (insert content) (unless (bolp) (insert "\n")))
+                (insert "\n" begin "\n"
+                        (format "[ -r %s ] && . %s\n"
+                                (shell-quote-argument integ)
+                                (shell-quote-argument integ))
+                        end "\n")
+                (write-region (point-min) (point-max) rc)))))))
+    ;; 1b. Symlink the vendored leticode/Emacs helper scripts onto PATH so a
+    ;;     non-interactive shell (leticode's Bash tool) can run them, and ensure
     ;;     they stay executable even if git didn't preserve the mode.
     (let ((bin-src (expand-file-name "shell/bin" repo))
           (bin-dst (expand-file-name "~/.local/bin")))
@@ -1368,65 +1383,61 @@ buffers, window layout, and project terminals."
                          (string= (file-truename dst) (file-truename src)))
               (when (file-exists-p dst) (delete-file dst))
               (make-symbolic-link src dst t))))))
-    ;; 3. Claude "inside Emacs" context overlay (vendored in ~/.emacs.d/claude):
-    ;;    symlink the hook + content into ~/.claude, and register the
-    ;;    SessionStart hook in ~/.claude/settings.json.  The JSON edit is
-    ;;    idempotent and defensive — it leaves the file untouched if our hook is
-    ;;    already there or on any parse/serialize error.
-    (let ((claude-src (expand-file-name "claude" repo)))
-      (when (file-directory-p claude-src)
-        (dolist (pair '(("inside-emacs.md" . "~/.claude/context/_env/inside-emacs.md")
-                        ("hooks/inside-emacs-context" . "~/.claude/hooks/inside-emacs-context")))
-          (let ((src (expand-file-name (car pair) claude-src))
-                (dst (expand-file-name (cdr pair))))
-            (when (file-exists-p src)
-              (make-directory (file-name-directory dst) t)
-              (unless (and (file-symlink-p dst)
-                           (string= (file-truename dst) (file-truename src)))
-                (when (file-exists-p dst) (delete-file dst))
-                (make-symbolic-link src dst t)))))
-        (let ((settings (expand-file-name "~/.claude/settings.json"))
-              (cmd "~/.claude/hooks/inside-emacs-context"))
-          (when (and (file-readable-p settings) (fboundp 'json-parse-string))
-            (condition-case err
-                (let* ((text (with-temp-buffer (insert-file-contents settings)
-                                               (buffer-string)))
-                       (data (json-parse-string text)) ; hash-tables = mutable form
-                       (changed nil))
-                  ;; (a) append our hook to each existing SessionStart matcher.
-                  (unless (string-search cmd text)
-                    (let* ((hooks (gethash "hooks" data))
-                           (ss (and hooks (gethash "SessionStart" hooks))))
-                      (when (and ss (> (length ss) 0))
-                        (dotimes (i (length ss))
-                          (let* ((entry (aref ss i))
-                                 (hs (gethash "hooks" entry))
-                                 (mh (make-hash-table :test 'equal)))
-                            (puthash "type" "command" mh)
-                            (puthash "command" cmd mh)
-                            (puthash "hooks" (vconcat hs (vector mh)) entry)))
-                        (setq changed t))))
-                  ;; (b) allowlist the vendored eopen/esay scripts, so Claude runs
-                  ;;     them without a permission prompt.
-                  (let* ((perms (or (gethash "permissions" data)
-                                    (let ((h (make-hash-table :test 'equal)))
-                                      (puthash "permissions" h data) h)))
-                         (allow (or (gethash "allow" perms) (vector))))
-                    (dolist (rule '("Bash(eopen:*)" "Bash(esay:*)" "Bash(enotify:*)"
-                                    "Bash(ecommit:*)" "Bash(ebuffer:*)" "Bash(esh:*)"
-                                    "Bash(etab:*)" "Bash(ediff-review:*)"))
-                      (unless (seq-contains-p allow rule)
-                        (setq allow (vconcat allow (vector rule)) changed t)))
-                    (puthash "allow" allow perms))
-                  (when changed
-                    (with-temp-file settings
-                      (insert (json-serialize data)))))
-              (error
-               (message "inside-emacs setup: left settings.json alone (%S)" err)))))))))
+    ;; 3. leticode "inside Emacs" context (vendored in ~/.emacs.d/leticode).
+    ;;    The Claude Code overlay this replaced used a SessionStart hook that exited 0 unless
+    ;;    $INSIDE_EMACS was set; leticode has no hooks -- its harness reads markdown
+    ;;    NOTES into the prompt -- so the overlay is a note instead.  A note cannot
+    ;;    be conditional per session, and this one is box-wide (every session on
+    ;;    this machine reads it), which is exactly why the note itself opens by
+    ;;    telling the model to check $INSIDE_EMACS before acting on it: the
+    ;;    condition moves from the hook into the text.
+    (let ((src (expand-file-name "leticode/inside-emacs.md" repo))
+          (dst (expand-file-name "~/.letibot/notes/inside-emacs.md")))
+      (when (file-exists-p src)
+        (make-directory (file-name-directory dst) t)
+        (unless (and (file-symlink-p dst)
+                     (string= (file-truename dst) (file-truename src)))
+          (when (file-exists-p dst) (delete-file dst))
+          (make-symbolic-link src dst t))))
+    ;; 3b. Let the `e*' bridge run without a permission prompt.  leticode's rules
+    ;;     are a JSON object of command-pattern -> allow/deny/ask in
+    ;;     ~/.config/letibot/permission.json, a file that is the USER's from install
+    ;;     on (its own header says so), so this is a defensive merge: it only ever
+    ;;     ADDS a rule that is missing, and leaves the file completely alone on any
+    ;;     parse/serialize error.  `json-insert', not `json-serialize' -- the file is
+    ;;     meant to be read and edited by hand, and serializing would flatten it.
+    (let ((perms (expand-file-name "~/.config/letibot/permission.json")))
+      (when (and (file-readable-p perms) (fboundp 'json-parse-string))
+        (condition-case err
+            (let* ((text (with-temp-buffer (insert-file-contents perms)
+                                           (buffer-string)))
+                   (data (json-parse-string text)) ; hash-tables = mutable form
+                   (bash (or (gethash "bash" data)
+                             (let ((h (make-hash-table :test 'equal)))
+                               (puthash "bash" h data) h)))
+                   (changed nil))
+              (dolist (rule '("eopen*" "esay*" "enotify*" "ecommit*" "ebuffer*"
+                              "esh*" "etab*" "ediff-review*"))
+                (unless (gethash rule bash)
+                  (puthash rule "allow" bash)
+                  (setq changed t)))
+              (when changed
+                (with-temp-file perms
+                  ;; Pretty-printed, not one long line: this file is the user's to read
+                  ;; and edit by hand, and `json-insert' by itself writes a single line
+                  ;; (`json-encoding-pretty-print' no longer controls it -- measured on
+                  ;; 31.1; `json-pretty-print-buffer' is what still works, and it needs
+                  ;; json.el loaded).
+                  (require 'json)
+                  (json-insert data)
+                  (json-pretty-print-buffer))))
+          (error
+           (message "inside-emacs setup: left permission.json alone (%S)" err)))))))
 
 ;; Never run the installer in batch: the headless smoke test (see AGENTS.md) LOADS
-;; this config to prove it still works, and it must not write to ~/.bashrc, create
-;; symlinks, or touch ~/.claude/settings.json as a side effect of being tested.
+;; this config to prove it still works, and it must not write to ~/.bashrc or
+;; ~/.zshrc, create symlinks, or touch ~/.config/letibot/permission.json as a side
+;; effect of being tested.
 (unless noninteractive
   (add-hook 'after-init-hook #'my-ensure-shell-integration))
 
@@ -1503,7 +1514,7 @@ then other known projects, then a browse-for-folder escape.  Order preserved."
           choice)))))
 
   (defvar my-project-tab-commands
-    '(("claude" . "claude --continue || claude"))
+    '(("leticode" . "leticode --continue || leticode"))
     "Startup command per byobu tab when the window has to be created.
 Tabs not listed here open as a plain shell.")
 
@@ -1595,7 +1606,7 @@ the shell-side trap never runs."
     "Open the project's byobu session and select WINDOW.
 WINDOW is a tab name (string), a tmux window index (integer), or nil to leave
 the session's active tab as-is (just show the terminal).  Starts the
-session with `bb' if needed (default tabs claude/shell/git/test); a string
+session with `bb' if needed (default tabs leticode/shell/git/test); a string
 names a tab (created on demand from `my-project-tab-commands', else a plain
 shell), an integer selects that window index — unambiguous when names clash.
 All tabs share one ghostel buffer; `my-ghostel-toggle-terminal' returns to your
@@ -1641,7 +1652,7 @@ code."
       buffer)))
 
   (defun my-project-tab-test   (&optional arg) "Select the byobu `test' tab."   (interactive "P") (my-project-tab "test"   arg))
-  (defun my-project-tab-claude (&optional arg) "Select the byobu `claude' tab." (interactive "P") (my-project-tab "claude" arg))
+  (defun my-project-tab-leticode (&optional arg) "Select the byobu `leticode' tab." (interactive "P") (my-project-tab "leticode" arg))
   (defun my-project-tab-git    (&optional arg) "Select the byobu `git' tab."    (interactive "P") (my-project-tab "git"    arg))
   (defun my-project-tab-shell  (&optional arg) "Select the byobu `shell' tab."  (interactive "P") (my-project-tab "shell"  arg))
   (defun my-project-tab-sudo   (&optional arg) "Select the byobu `sudo' tab (an `esh'-spawned window awaiting your password)." (interactive "P") (my-project-tab "sudo" arg))
@@ -1770,7 +1781,7 @@ Falls back to the default tab names if the session isn't running yet."
                             (equal (nth 1 p) "1"))))
                   lines)
         (seq-map-indexed (lambda (n i) (list i n nil))
-                         '("claude" "shell" "git" "test")))))
+                         '("leticode" "shell" "git" "test")))))
 
   (defun my-byobu--labeled (windows)
     "Alist (LABEL . INDEX) for WINDOWS (each (INDEX NAME ACTIVE)).
@@ -1851,8 +1862,8 @@ can be selected.  (Bound to `C-t C-k'; copy mode is `C-c C-t', no clash.)"
         (call-process "tmux" nil nil nil "kill-window"
                       "-t" (format "=%s:%d" (my-byobu--session project) idx)))))
 
-  (defun my-claude--send-to-tab (text)
-    "Bracketed-paste TEXT into the current project's byobu `claude' tab and focus
+  (defun my-leticode--send-to-tab (text)
+    "Bracketed-paste TEXT into the current project's byobu `leticode' tab and focus
 it (without swapping the current window's buffer, which would hide the fresh
 paste).  No project -> ask which running session.  Records the source buffer so
 `C-t C-t' returns here.  Shared by the region-cite and buffer-reference commands."
@@ -1869,9 +1880,9 @@ paste).  No project -> ask which running session.  Records the source buffer so
                             "\n" t))))
                   (unless ss (user-error "No project byobu sessions running"))
                   (completing-read "Send to session: " ss nil t))))
-           (target (concat "=" session ":claude")))
+           (target (concat "=" session ":leticode")))
       (unless (zerop (call-process "tmux" nil nil nil "select-window" "-t" target))
-        (user-error "No `claude' tab in %s (open it with C-t C-c)" session))
+        (user-error "No `leticode' tab in %s (open it with C-t C-c)" session))
       (unless root (setq my-ghostel--cited-session session)) ; sticky association
       (with-temp-buffer
         (insert text)
@@ -1885,32 +1896,32 @@ paste).  No project -> ask which running session.  Records the source buffer so
                               (buffer-local-value 'major-mode src) 'ghostel-mode)))
           (with-current-buffer gbuf (setq-local my-ghostel--return-buffer src)))
         (cond (win  (select-window win))       ; byobu visible -> refocus, no swap
-              (root (my-project-tab "claude"))  ; not visible -> open project claude
+              (root (my-project-tab "leticode")) ; not visible -> open the project tab
               (gbuf (pop-to-buffer gbuf))))))   ; ask-path, hidden -> reveal
 
-  (defun my-send-region-to-claude (start end)
-    "Cite the region to the project's byobu `claude' tab (single line as inline
-code, multi-line as a fenced block), then focus the claude tab to add a question.
+  (defun my-send-region-to-leticode (start end)
+    "Cite the region to the project's byobu `leticode' tab (single line as inline
+code, multi-line as a fenced block), then focus that tab to add a question.
 No project -> ask which running session.  Bound to `C-t C-y'."
     (interactive "r")
     (unless (use-region-p) (user-error "Select a region first"))
     (let ((sel (buffer-substring-no-properties start end)))
-      (my-claude--send-to-tab
+      (my-leticode--send-to-tab
        (if (string-match-p "\n" sel) (concat "```\n" sel "\n```\n") (concat "`" sel "`"))))
     (deactivate-mark)
-    (message "Cited region to claude"))
+    (message "Cited region to leticode"))
 
-  (defun my-cite-buffer-to-claude ()
-    "Pick a buffer (`C-x b'-style) and send a *reference* to it -- a path Claude
-can Read, not the pasted content -- to the project's claude tab, then focus it.
+  (defun my-cite-buffer-to-leticode ()
+    "Pick a buffer (`C-x b'-style) and send a *reference* to it -- a path leticode
+can Read, not the pasted content -- to the project's leticode tab, then focus it.
 A saved, unmodified file gives its real path; anything else a live snapshot.
-Bound to `C-t C-b': the no-jank way to point Claude at a specific buffer (the
-picker runs natively in Emacs, not via a remote `read-buffer')."
+Bound to `C-t C-b': the no-jank way to point the assistant at a specific buffer
+(the picker runs natively in Emacs, not via a remote `read-buffer')."
     (interactive)
-    (let* ((name (read-buffer "Reference buffer to Claude: " nil t))
+    (let* ((name (read-buffer "Reference buffer to leticode: " nil t))
            (path (my-ebuffer-ref name)))
-      (my-claude--send-to-tab (format "Please Read this buffer for me: %s\n" path))
-      (message "Referenced %s to claude" name)))
+      (my-leticode--send-to-tab (format "Please Read this buffer for me: %s\n" path))
+      (message "Referenced %s to leticode" name)))
 
   (defun my-projectile--byobu-window (session)
     "Return the active tmux window name in SESSION (\"\" if not running)."
@@ -1934,7 +1945,7 @@ ghostel buffer redraws whichever tab ends up selected."
        ;; Window exists -> select it.
        ((zerop (call-process "tmux" nil nil nil "select-window" "-t" tgt)) nil)
        ;; Window missing, but a fresh `bb' may still be spawning its default tabs
-       ;; (claude/shell/git/test one by one) -> keep WAITING rather than racing bb
+       ;; (leticode/shell/git/test one by one) -> keep WAITING rather than racing bb
        ;; into a duplicate window.  Only fall through to create as a last resort,
        ;; for a genuinely custom tab bb never makes.
        ((> tries 2)
@@ -1985,7 +1996,7 @@ remembering this buffer to come back to."
               (t     (my-project-tab nil))))))               ; prompt (open projects first)
 
   (defun my-ghostel-open-referenced-file ()
-    "Open a file Claude referenced in the visible terminal.
+    "Open a file leticode referenced in the visible terminal.
 Scans the visible region for tool forms -- `Write(path)' / `Edit(path)' /
 `Read(path)' / `Update(path)' etc. -- and opens the one you pick (or the only
 one) in the other window, resolved against the terminal's directory.  A robust
@@ -2010,7 +2021,7 @@ click or RET on one and it jumps to the line; see `ghostel--open-link'.)"
 
   (defun my-ebuffer-ref (&optional which)
     "Return a file path whose contents represent a buffer, for the `ebuffer'
-script -- so Claude can Read the buffer you mean without you pasting it.
+script -- so leticode can Read the buffer you mean without you pasting it.
 WHICH is nil for the byobu return buffer (\"this/that/the buffer\"), or a
 buffer-name string.  A saved, unmodified file buffer yields its own path;
 anything else (unsaved edits, a non-file buffer) is snapshotted to a temp file
@@ -2035,52 +2046,52 @@ first.  (To *pick* a buffer, the user runs `C-t C-b' in Emacs -- no remote
   ;; --- "task done, come back" notice -------------------------------------------
   ;; `esay' messages vanish on the next echo; this one persists in the frame
   ;; title (WM bar, visible even when Emacs is unfocused) and the mode line until
-  ;; you return to a terminal.  The `enotify' script calls `my-claude-notify'.
-  (defvar my-claude--notice nil
-    "Pending \"Claude is ready\" notice, shown in the frame title and mode line
-until you next select a terminal.  Set by `my-claude-notify' / `enotify'.")
+  ;; you return to a terminal.  The `enotify' script calls `my-leticode-notify'.
+  (defvar my-leticode--notice nil
+    "Pending \"leticode is ready\" notice, shown in the frame title and mode line
+until you next select a terminal.  Set by `my-leticode-notify' / `enotify'.")
 
-  (defun my-claude-notify (&optional msg)
+  (defun my-leticode-notify (&optional msg)
     "Raise a persistent notice (frame title + mode-line flag + an echo line) that
 a background/long task finished, so you can switch back.  Cleared automatically
 when you next select a terminal buffer."
     (interactive)
-    (setq my-claude--notice (or msg "ready"))
+    (setq my-leticode--notice (or msg "ready"))
     (force-mode-line-update t)
-    (message "🔔 Claude: %s" my-claude--notice))
+    (message "🔔 leticode: %s" my-leticode--notice))
 
-  (defun my-claude-clear-notice (&rest _)
-    "Clear `my-claude--notice' (frame title + mode-line flag)."
+  (defun my-leticode-clear-notice (&rest _)
+    "Clear `my-leticode--notice' (frame title + mode-line flag)."
     (interactive)
-    (when my-claude--notice
-      (setq my-claude--notice nil)
+    (when my-leticode--notice
+      (setq my-leticode--notice nil)
       (force-mode-line-update t)))
 
-  (defun my-claude--clear-on-terminal (&rest _)
+  (defun my-leticode--clear-on-terminal (&rest _)
     "Clear the notice once a terminal is the selected window (you came back)."
-    (when (and my-claude--notice
+    (when (and my-leticode--notice
                (provided-mode-derived-p
                 (buffer-local-value 'major-mode (window-buffer (selected-window)))
                 'ghostel-mode))
-      (my-claude-clear-notice)))
-  (add-hook 'window-selection-change-functions #'my-claude--clear-on-terminal)
+      (my-leticode-clear-notice)))
+  (add-hook 'window-selection-change-functions #'my-leticode--clear-on-terminal)
 
-  (defun my-claude--clear-on-terminal-input ()
+  (defun my-leticode--clear-on-terminal-input ()
     "Clear the notice once you act inside a terminal — typing, or switching byobu
 tabs with `C-t C-s' (e.g. to run an `esh'-queued sudo command), doesn't change
 the selected Emacs window, so `window-selection-change-functions' alone misses
 it.  Guarded on the notice being set, so it's a cheap no-op the rest of the time."
-    (when (and my-claude--notice (derived-mode-p 'ghostel-mode))
-      (my-claude-clear-notice)))
-  (add-hook 'post-command-hook #'my-claude--clear-on-terminal-input)
+    (when (and my-leticode--notice (derived-mode-p 'ghostel-mode))
+      (my-leticode-clear-notice)))
+  (add-hook 'post-command-hook #'my-leticode--clear-on-terminal-input)
 
   ;; Persist the notice on the frame title and the mode line (both clear with it).
   (setq frame-title-format
-        '((my-claude--notice (:eval (concat "🔔 " my-claude--notice "  —  ")))
+        '((my-leticode--notice (:eval (concat "🔔 " my-leticode--notice "  —  ")))
           (multiple-frames "%b" ("" "%b - GNU Emacs at " system-name))))
   (add-to-list 'global-mode-string
-               '(my-claude--notice
-                 (:eval (propertize (concat "🔔 " my-claude--notice " ") 'face 'warning)))
+               '(my-leticode--notice
+                 (:eval (propertize (concat "🔔 " my-leticode--notice " ") 'face 'warning)))
                t)
 
   ;; C-t is a real PREFIX keymap (not a command — a command can't host a chord).
@@ -2090,15 +2101,15 @@ it.  Guarded on the notice being set, so it's a cheap no-op the rest of the time
     (let ((map (make-sparse-keymap)))
       ;; C- chords = direct actions (C-t toggles back to your code).
       (define-key map (kbd "C-t") #'my-ghostel-toggle-terminal)
-      (define-key map (kbd "C-c") #'my-project-tab-claude)
+      (define-key map (kbd "C-c") #'my-project-tab-leticode)
       (define-key map (kbd "C-g") #'my-project-tab-git)
       (define-key map (kbd "C-s") #'my-project-tab-shell)
       (define-key map (kbd "C-u") #'my-project-tab-sudo)    ; jump to esh's sudo window
       (define-key map (kbd "C-n") #'my-byobu-new-window)    ; new window (ask name)
       (define-key map (kbd "C-k") #'my-byobu-close-window)  ; close (default: current)
-      (define-key map (kbd "C-y") #'my-send-region-to-claude) ; cite region to claude
-      (define-key map (kbd "C-f") #'my-ghostel-open-referenced-file) ; open file Claude referenced
-      (define-key map (kbd "C-b") #'my-cite-buffer-to-claude)        ; reference a buffer to claude
+      (define-key map (kbd "C-y") #'my-send-region-to-leticode) ; cite region to the assistant
+      (define-key map (kbd "C-f") #'my-ghostel-open-referenced-file) ; open a file the assistant referenced
+      (define-key map (kbd "C-b") #'my-cite-buffer-to-leticode)        ; reference a buffer to the assistant
       (define-key map (kbd "C-w") #'my-copy-file-path-with-line)     ; kill `path:line:col' at point
       ;; Any other key (a plain letter) -> type-to-filter window switch, seeded
       ;; with that key: C-t t -> test, C-t <type a name> -> that window.  So the
@@ -2225,12 +2236,16 @@ just gets a `<2>' suffix).  This is what makes save/restore match reliably."
   ;; always matches.  (Was `ghostel-set-title-function nil', which only disabled
   ;; renaming and so let divergent names — e.g. `*ghostel ~/.emacs.d/*' — persist.)
   (ghostel-buffer-name-function #'my-ghostel--name-by-project)
-  ;; Rendering for Claude Code (run directly in ghostel via C-t C-c).  Ink does
+  ;; Rendering for the assistant TUI (run directly in ghostel via C-t C-c).  The
+  ;; numbers below were measured against Claude Code's Ink renderer, which does
   ;; aggressive partial screen updates and emits >256 bytes per keystroke, so the
   ;; default incremental path + 256-byte immediate-redraw budget defers the frame
   ;; to the idle timer — making a typed space appear only on the next keystroke.
-  ;;   * full-redraw t        — robust with Claude Code's partial updates (per the
-  ;;                            option's own docs); costs a little more CPU.
+  ;; leticode's TUI is a different (Rust) renderer, so re-measure if the CPU
+  ;; matters: full-redraw is the option's own recommendation for partial-update
+  ;; TUIs and is safe for any of them, just costlier.
+  ;;   * full-redraw t        — robust with partial updates (per the option's own
+  ;;                            docs); costs a little more CPU.
   ;;   * larger redraw budget — treat bigger per-key echoes as interactive and
   ;;                            redraw them immediately instead of on the timer.
   (ghostel-full-redraw t)

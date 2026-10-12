@@ -71,16 +71,33 @@ else
 fi
 
 step "shell: parse + lint"
+# Every vendored script, in both languages.  `.zsh' files need `zsh -n': bash -n on
+# zsh syntax is a false failure (and ShellCheck is bash-only, so the zsh half is
+# checked for PARSE only -- a .zsh file in the ShellCheck list would lint as bash).
 mapfile -t scripts < <(git ls-files |
-    grep -E '^(bin|shell/bin|byobu/bin|claude/hooks)/|\.bash$')
+    grep -E '^(bin|shell/bin|byobu/bin)/|\.bash$|\.zsh$')
+mapfile -t bash_scripts < <(printf '%s\n' "${scripts[@]}" | grep -v '\.zsh$')
 
+have_zsh=1
 for f in "${scripts[@]}"; do
-    bash -n "$f" 2>/dev/null || bad "does not parse: $f"
+    case "$f" in
+        *.zsh)
+            if command -v zsh >/dev/null 2>&1; then
+                zsh -n "$f" 2>/dev/null || bad "does not parse: $f"
+            else
+                have_zsh=0
+            fi
+            ;;
+        *) bash -n "$f" 2>/dev/null || bad "does not parse: $f" ;;
+    esac
 done
 printf '    ok   %s scripts parse\n' "${#scripts[@]}"
+if [ "$have_zsh" -eq 0 ]; then
+    printf '    --   zsh not installed, .zsh files not parsed\n'
+fi
 
 if command -v shellcheck >/dev/null 2>&1; then
-    if shellcheck "${scripts[@]}"; then
+    if shellcheck "${bash_scripts[@]}"; then
         printf '    ok   shellcheck clean\n'
     else
         bad "shellcheck findings above"
