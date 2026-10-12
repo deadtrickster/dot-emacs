@@ -2256,26 +2256,31 @@ just gets a `<2>' suffix).  This is what makes save/restore match reliably."
   (ghostel-module-compile-command
    "zig build --color on --prefix %s -Doptimize=ReleaseFast -Dcpu=baseline")
   :custom-face
-  ;; The installed ghostel palette inherits `ansi-color-*' (red3, green3, …),
-  ;; but the theme customizes `term-color-*'.  Point the palette at the themed
-  ;; faces — same trick the old vterm-color-* faces used — so the terminal uses
-  ;; the Emacs theme colors.  ghostel reads each face's :foreground.
-  (ghostel-color-black          ((t (:inherit term-color-black))))
-  (ghostel-color-red            ((t (:inherit term-color-red))))
-  (ghostel-color-green          ((t (:inherit term-color-green))))
-  (ghostel-color-yellow         ((t (:inherit term-color-yellow))))
-  (ghostel-color-blue           ((t (:inherit term-color-blue))))
-  (ghostel-color-magenta        ((t (:inherit term-color-magenta))))
-  (ghostel-color-cyan           ((t (:inherit term-color-cyan))))
-  (ghostel-color-white          ((t (:inherit term-color-white))))
-  (ghostel-color-bright-black   ((t (:inherit term-color-black))))
-  (ghostel-color-bright-red     ((t (:inherit term-color-red))))
-  (ghostel-color-bright-green   ((t (:inherit term-color-green))))
-  (ghostel-color-bright-yellow  ((t (:inherit term-color-yellow))))
-  (ghostel-color-bright-blue    ((t (:inherit term-color-blue))))
-  (ghostel-color-bright-magenta ((t (:inherit term-color-magenta))))
-  (ghostel-color-bright-cyan    ((t (:inherit term-color-cyan))))
-  (ghostel-color-bright-white   ((t (:inherit term-color-white))))
+  ;; The palette ghostel paints with: ANSI slot -> the themed face for that slot.
+  ;; ghostel reads each face's `:foreground', so these must be faces that EXIST
+  ;; here.  They inherit `ansi-color-*' and NOT `term-color-*': `term-color-*' is
+  ;; only defined once term.el loads, so inheriting it resolved to NOTHING at
+  ;; init, ghostel had no palette at all, and a cell that needs a background got
+  ;; one with no foreground set -- the user-message row came out light on light,
+  ;; which is how the operator's "my prompts are not visible, only inside Emacs"
+  ;; was reported.  `ansi-color-*' exists as soon as the theme is enabled (the
+  ;; theme defines it), and each face keeps its normal/bright split.
+  (ghostel-color-black          ((t (:inherit ansi-color-black))))
+  (ghostel-color-red            ((t (:inherit ansi-color-red))))
+  (ghostel-color-green          ((t (:inherit ansi-color-green))))
+  (ghostel-color-yellow         ((t (:inherit ansi-color-yellow))))
+  (ghostel-color-blue           ((t (:inherit ansi-color-blue))))
+  (ghostel-color-magenta        ((t (:inherit ansi-color-magenta))))
+  (ghostel-color-cyan           ((t (:inherit ansi-color-cyan))))
+  (ghostel-color-white          ((t (:inherit ansi-color-white))))
+  (ghostel-color-bright-black   ((t (:inherit ansi-color-bright-black))))
+  (ghostel-color-bright-red     ((t (:inherit ansi-color-bright-red))))
+  (ghostel-color-bright-green   ((t (:inherit ansi-color-bright-green))))
+  (ghostel-color-bright-yellow  ((t (:inherit ansi-color-bright-yellow))))
+  (ghostel-color-bright-blue    ((t (:inherit ansi-color-bright-blue))))
+  (ghostel-color-bright-magenta ((t (:inherit ansi-color-bright-magenta))))
+  (ghostel-color-bright-cyan    ((t (:inherit ansi-color-bright-cyan))))
+  (ghostel-color-bright-white   ((t (:inherit ansi-color-bright-white))))
   :config
   ;; ghostel-max-scrollback defaults to 5MB — fine as-is.
   ;; C-t inside a terminal is the same prefix as everywhere else: C-t C-t toggles

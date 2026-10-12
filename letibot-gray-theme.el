@@ -82,7 +82,12 @@
                               :family "Hack" :height 95
                               :width normal
                               :slant normal :weight regular))))
-   `(cursor ((t (:background ,fg))))
+   ;; Block cursor in the terminal's foreground colour -- and WITH a foreground,
+   ;; deliberately: a coloured block with no foreground of its own is a trap, and
+   ;; this is the one that bit.  Ghostel paints terminal cells itself, so a cell
+   ;; whose background is set while the foreground is left to inherit comes out
+   ;; `#d3d7d9' on `#d3d7d9' -- the operator's own message row, invisible.
+   `(cursor ((t (:background ,fg :foreground ,bg))))
    `(region ((t (:background ,sel-bg :foreground ,sel-fg))))
    `(secondary-selection ((t (:background ,raised))))
    `(hl-line ((t (:background ,raised))))          ; rano's raised surface
