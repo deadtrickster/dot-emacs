@@ -794,14 +794,17 @@ each time.  So the listing draws immediately and the column lands a moment later
 ;; Menlo 12 -- a font and size the config never asked for, and nothing warned.
 ;; Linux keeps the theme's own 9.5pt.  Tune to taste: points x10, so 130 = 13pt.
 ;;
-;; And the text was heavier than the terminal's beside it even at the same font and
-;; size, which is not Hack's fault: Emacs draws macOS text with THICK strokes by
-;; default (`ns-use-thin-smoothing' is nil), while AppKit apps -- Ghostty among
-;; them -- take the thin stroke / font-smoothing path.  This is that path.
+;; NB: do NOT reach for `ns-use-thin-smoothing' for macOS text weight.  Its own
+;; docstring promises "thinner strokes", but in 31.1 the variable is NEVER READ:
+;; the C identifier occurs only in the DEFVAR that defines it (checked in
+;; src/nsterm.m and src/nsfont.m), so setting it cannot change anything.
+;; Text weight on macOS belongs to CoreText, and the lever is an app default --
+;; `defaults write org.gnu.Emacs CGFontRenderingFontSmoothingDisabled -bool true'
+;; -- which is read at LAUNCH, hence the restart.  Machine state, not config,
+;; so it is not set from here.
 (when (eq system-type 'darwin)
   (dolist (face '(default line-number))
-    (set-face-attribute face nil :height 130))
-  (setq ns-use-thin-smoothing t))
+    (set-face-attribute face nil :height 130)))
 
 ;; ---------------------------------------------------------------------------
 ;; Terminal (tty) frames — `etty' / `emacsclient -nw', typically over ssh.
