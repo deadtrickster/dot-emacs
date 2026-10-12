@@ -2413,6 +2413,39 @@ just gets a `<2>' suffix).  This is what makes save/restore match reliably."
   (define-key ghostel-mode-map (kbd "C-x 3") #'my-ghostel-split-view-right)
   (define-key ghostel-mode-map (kbd "C-x 2") #'my-ghostel-split-view-below)
 
+  ;; Hover.  A TUI that asks for any-event mouse tracking (DEC 1003) -- letibot
+  ;; does, to bold the clickable segment under the pointer -- expects a report
+  ;; for every cell the pointer crosses, buttons or not.  Ghostty sends them;
+  ;; ghostel only streams motion DURING A DRAG, and its `ghostel--mouse-event'
+  ;; cannot say "no button" (the module casts BUTTON into libghostty's enum, and
+  ;; 0 is `unknown', which the encoder drops), so the hover never arrived.  Encode
+  ;; the SGR report ourselves -- `ESC [ < 35 ; col ; row M', 35 = "no button" (3)
+  ;; + motion (32) -- and only when the program asked for both 1003 and SGR
+  ;; (1006), the pair letibot enables; any other mode set keeps ghostel's own
+  ;; behaviour.  Emacs only produces `mouse-movement' while `track-mouse' is
+  ;; non-nil, so it is on buffer-locally in terminals (the drag path saves and
+  ;; restores it around a drag).  Deduped per cell so the PTY is not flooded.
+  (defvar-local my-ghostel--hover-cell nil
+    "Last (COL . ROW) reported to the terminal as a buttonless hover.")
+  (defun my-ghostel-hover-motion (event)
+    "Report buttonless mouse motion EVENT to a program tracking any-event motion."
+    (interactive "e")
+    (let* ((posn (event-start event))
+           (win (posn-window posn)))
+      (when (and (windowp win) (posn-x-y posn) (null (posn-area posn)))
+        (with-current-buffer (window-buffer win)
+          (when (and (derived-mode-p 'ghostel-mode) ghostel--term
+                     (ghostel--mode-enabled ghostel--term 1003)
+                     (ghostel--mode-enabled ghostel--term 1006))
+            (let ((cell (ghostel--posn-cell posn)))
+              (unless (equal cell my-ghostel--hover-cell)
+                (setq my-ghostel--hover-cell cell)
+                (ghostel--write-pty ghostel--term
+                                    (format "\e[<35;%d;%dM"
+                                            (1+ (car cell)) (1+ (cdr cell)))))))))))
+  (define-key ghostel-mode-map [mouse-movement] #'my-ghostel-hover-motion)
+  (add-hook 'ghostel-mode-hook (lambda () (setq-local track-mouse t)))
+
   ;; Route every `compile' / `compilation-start' through a real ghostel terminal:
   ;; the output is a proper terminal (colors, cursor moves, TUI progress -- e.g.
   ;; zig's build tree -- all render), and on finish it finalizes to the requested
