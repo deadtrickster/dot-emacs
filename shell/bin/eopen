@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Open file(s) in the user's running Emacs, non-blocking, resolved to absolute
-# paths.  Standalone so it works from a NON-interactive shell (e.g. Claude Code's
+# paths.  Standalone so it works from a NON-interactive shell (e.g. leticode's
 # Bash tool, which never sources ~/.bashrc) and distinctly named so it never
 # clashes with /usr/bin/open.  Vendored here; symlinked onto PATH (~/.local/bin)
-# by `my-ensure-shell-integration'.  Allowlist in Claude with: Bash(eopen:*)
+# by `my-ensure-shell-integration'.  Pre-approved by the `eopen*` rule in ~/.config/letibot/permission.json.
 set -euo pipefail
 
 # Resolve to an absolute path.  `realpath -m' is GNU coreutils; macOS ships BSD
 # /bin/realpath, which rejects BOTH `-m' and `--' -- so this line used to die with
-# "illegal option" before emacsclient ever ran, and `e', `open' and Claude's
+# "illegal option" before emacsclient ever ran, and `e', `open' and leticode's
 # `eopen' silently did nothing on a Mac.  Probe once, then fall back to chdir'ing
 # into the PARENT and printing $PWD: for the paths we are handed (existing files,
 # or a new one whose directory exists) that is the same answer, and `-m' semantics

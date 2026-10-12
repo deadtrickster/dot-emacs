@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Stage a command in a byobu tab WITHOUT running it -- the inverse of `esh'.
-# When Claude shouldn't auto-run something (a big/risky command the human wants
+# When leticode shouldn't auto-run something (a big/risky command the human wants
 # to eyeball first), instead of executing it TYPES the text into a chosen byobu
 # window and STOPS -- no Enter.  The user switches there (C-t <tab>), reads it,
 # edits if they like, and presses Enter themselves.
@@ -8,7 +8,7 @@
 #   etab <window> "text"        stage literal TEXT in the <window> tab
 #   etab <window> -F <file>     stage the contents of FILE -- use this for big or
 #                               multi-line commands: a lone command, so it stays
-#                               matched by Bash(etab:*) and never trips a prompt,
+#                               matched by the `etab*` rule and never trips a prompt,
 #                               and avoids quoting a huge string on the CLI.
 #
 # It must have NO way to execute itself:
@@ -19,7 +19,7 @@
 #     dangles as a submit;
 #   * pastes via tmux BRACKETED paste (`paste-buffer -p'), so even internal
 #     newlines land as literal text in the line editor, not command submissions.
-# Allowlist: Bash(etab:*)
+# Pre-approved by the `etab*` rule in ~/.config/letibot/permission.json.
 set -euo pipefail
 
 win="${1:-}"

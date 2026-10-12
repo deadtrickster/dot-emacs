@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
-# Run a command Claude CAN'T run itself -- one that needs `sudo' (a password) --
+# Run a command leticode CAN'T run itself -- one that needs `sudo' (a password) --
 # in a DEDICATED, throwaway byobu window, so the user's `shell' tab stays
-# untouched.  Claude has no password, so instead of failing it hands the command
+# untouched.  leticode has no password, so instead of failing it hands the command
 # to the human: `esh "sudo ..."' opens a new `sudo' window, runs the command
 # there (the password prompt shows), and raises a notice.  The user jumps over
 # (C-t C-u), enters their password, and it runs.  ONLY for sudo/privileged
-# commands -- everything else Claude just runs.
+# commands -- everything else leticode just runs.
 #
-# Three modes (all under one allowlist entry -- Bash(esh:*)):
+# Three modes (covered by one `esh*` rule):
 #   esh "sudo apt install rg"   launch: new window, run it, notify; prints an id
-#   esh -w <id>                 wait (Claude runs this in BACKGROUND): blocks
+#   esh -w <id>                 wait (leticode runs this in BACKGROUND): blocks
 #                               until the command finishes, prints EXIT=<code>
 #                               and the captured output -- the "signal back"
 #   esh -k <id>                 kill the sudo window + clean up (after reporting)
 #
-# The launch prints the id; Claude then backgrounds `esh -w <id>' to be woken on
+# The launch prints the id; leticode then backgrounds `esh -w <id>' to be woken on
 # completion, reports the result, and `esh -k <id>' closes the window.
-# Allowlist: Bash(esh:*)
+# Pre-approved by the `esh*` rule in ~/.config/letibot/permission.json.
 set -euo pipefail
 
 state_dir() {

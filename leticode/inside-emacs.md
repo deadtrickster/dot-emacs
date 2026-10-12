@@ -1,7 +1,13 @@
-## Environment — you are running inside Emacs
+## Environment — when $INSIDE_EMACS is set, you are running inside Emacs
 
-You're in a **ghostel** terminal (an in-Emacs libghostty terminal) inside a
-**byobu/tmux** session, launched from the user's Emacs. What this means:
+**This note is box-wide: EVERY leticode session on this machine reads it, not only
+the ones inside Emacs.**  So check `$INSIDE_EMACS` before acting on anything below
+(`[ -n "$INSIDE_EMACS" ] && echo yes`).  If it is unset you are in an ordinary
+terminal: no editor is listening at the other end of `emacsclient`, the `e*`
+helpers below reach nobody, and nothing here applies.
+
+When it IS set, you're in a **ghostel** terminal (an in-Emacs libghostty terminal)
+inside a **byobu/tmux** session, launched from the user's Emacs. What this means:
 
 - **`$EDITOR` / `$GIT_EDITOR` is `emacsclient`.** A bare `git commit` or
   `git rebase -i` opens a buffer in the user's *running* Emacs (magit
@@ -55,11 +61,11 @@ You're in a **ghostel** terminal (an in-Emacs libghostty terminal) inside a
 - **"put this / that command in the `<tab>` tab" → `etab <tab> -F <file>`.** When
   they ask you to *stage* a command in a byobu tab for them to run (e.g. "put that
   command into the test tab for me") — rather than running it yourself — write the
-  command to a scratchpad file and run `etab <tab> -F <file>` (a lone command, so
-  `Bash(etab:*)` doesn't trip; also avoids quoting a big string). It **types the
-  text into that tab and stops — no Enter** (sanitized so it can't execute itself:
-  CR/ESC/control stripped, bracketed paste), so they switch there (`C-t <tab>`),
-  review, and press Enter to run. Short one-liners can go inline: `etab test "…"`.
+  command to a scratchpad file and run `etab <tab> -F <file>` (a lone command, and
+  the `etab*` rule in ~/.config/letibot/permission.json pre-approves it; also
+  avoids quoting a big string). It **types the text into that tab and stops — no
+  Enter** (sanitized so it can't execute itself: CR/ESC/control stripped, bracketed
+  paste), so they switch there (`C-t <tab>`), review, and press Enter to run. Short one-liners can go inline: `etab test "…"`.
   This is the inverse of `esh` (which runs a sudo command); `etab` never runs
   anything. The `<tab>` is the byobu window name they said (`test`, `shell`, …).
 - **Propose a risky edit for review with `ediff-review <target> <proposed>`.**
@@ -77,7 +83,7 @@ You're in a **ghostel** terminal (an in-Emacs libghostty terminal) inside a
   decision in Emacs is the *sole* approval — it's allowlisted, so there's no
   separate permission prompt. Use it for edits worth a human gate; keep using the
   normal file tools for routine ones.
-- **The user navigates with `C-t`** (a prefix): `C-t C-c` claude, `C-t C-g` git,
+- **The user navigates with `C-t`** (a prefix): `C-t C-c` leticode, `C-t C-g` git,
   `C-t C-s` shell, and `C-t C-t` toggles between their code buffer and this
   terminal — so they hop away and back; you share the one byobu session. They
   can also `C-t C-f` to open any file/line you reference in your output — so just

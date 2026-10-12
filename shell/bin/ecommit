@@ -8,7 +8,7 @@
 # .git) and only its PATH is passed to Emacs -- the message text is never
 # shell-interpolated, so backticks/quotes/$ in it are safe.  `my-magit-commit'
 # runs `git commit -e -F <that file>' via magit/with-editor.
-# Allowlist: Bash(ecommit:*)
+# Pre-approved by the `ecommit*` rule in ~/.config/letibot/permission.json.
 set -euo pipefail
 msgfile="$(git rev-parse --absolute-git-dir)/ECOMMIT_MSG"
 if [ "${1:-}" = "-F" ]; then

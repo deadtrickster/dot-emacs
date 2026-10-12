@@ -14,7 +14,7 @@
 # a plain (non `-n') `emacsclient', which waits until Emacs `server-edit's that
 # buffer -- exactly what accept/reject do.  No polling.  Run it in the BACKGROUND
 # so its completion wakes you.  Standalone so it works from a non-interactive
-# shell.  Allowlist: Bash(ediff-review:*)
+# shell.  Pre-approved by the `ediff-review*` rule in ~/.config/letibot/permission.json.
 set -euo pipefail
 
 target="${1:?usage: ediff-review <target> <proposed>}"

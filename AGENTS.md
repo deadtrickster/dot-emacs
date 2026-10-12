@@ -11,10 +11,10 @@ up the rest.
 |---|---|
 | `early-init.el` | Pre-package init. **Only** MELPA registration — must live here (runs before `package-initialize`). |
 | `init.el` | The entire Emacs config, `use-package`-based throughout. |
-| `shell/integration.bash` | Vendored shell integration: `bb`/`bb-reset`, ghostel/`emacsclient` helpers, direnv hook, git-prompt. Sourced by `~/.bashrc`. |
-| `shell/bin/*` | Vendored standalone helper scripts symlinked onto PATH (`~/.local/bin`) by the installer so Claude's non-interactive shell can run them: the `e*` Emacs bridge (`eopen`, `esay`, `enotify`, `ecommit`, `ebuffer`, `esh`, `etab`, `etty`, `ediff-review`) + the `oriole-*` formatters. |
+| `shell/integration.bash` / `shell/integration.zsh` | Vendored shell integration: `bb`/`bb-reset`, ghostel/`emacsclient` helpers, direnv hook, git-prompt. One file per shell, sourced by `~/.bashrc` / `~/.zshrc` — ghostel spawns `$SHELL`, which is bash on the Linux box and zsh on a Mac, so **keep the two in sync**. |
+| `shell/bin/*` | Vendored standalone helper scripts symlinked onto PATH (`~/.local/bin`) by the installer so the assistant's non-interactive shell can run them: the `e*` Emacs bridge (`eopen`, `esay`, `enotify`, `ecommit`, `ebuffer`, `esh`, `etab`, `etty`, `ediff-review`) + the `oriole-*` formatters. |
 | `byobu/{status,.tmux.conf,bin/bb-save-layout}` | Vendored byobu config; symlinked into `~/.config/byobu/`. |
-| `claude/{inside-emacs.md,hooks/inside-emacs-context}` | Vendored "Claude is running inside Emacs" context overlay + its `SessionStart` hook; symlinked into `~/.claude/` and registered in `~/.claude/settings.json`. |
+| `leticode/inside-emacs.md` | Vendored "you are running inside Emacs" note; symlinked into `~/.letibot/notes/`. leticode has no hooks — its harness reads markdown notes into the prompt — so the note itself says to check `$INSIDE_EMACS` first: unlike a `SessionStart` hook it cannot be conditional, and it is box-wide (read in a plain terminal too). |
 | `bin/check` | The test suite: elisp parens + a full headless load of the config, then `bash -n`/`shellcheck` over every vendored script. Run before committing. |
 | `AGENTS.md` / `CLAUDE.md` | This file; `CLAUDE.md` just `@`-imports it. |
 | `.gitignore` | Everything else under `~/.emacs.d` is generated (elpa, eln-cache, quelpa, tree-sitter, caches, sessions) and ignored. |
@@ -24,17 +24,22 @@ Do **not** commit generated files. The hand-maintained set above is all there is
 ## How Emacs drives the install
 
 `my-ensure-shell-integration` (in `init.el`, on `after-init-hook`) is idempotent and:
-1. Appends an emacs-managed block to `~/.bashrc` that sources `shell/integration.bash`.
+1. Appends an emacs-managed block to each shell's rc — `~/.bashrc` →
+   `shell/integration.bash`, `~/.zshrc` → `shell/integration.zsh` (`~/.bashrc` is
+   created even when absent: a non-interactive shell reads it and nothing else;
+   `~/.zshrc` only where zsh exists).
 2. Symlinks `byobu/{status,.tmux.conf,bin/bb-save-layout}` → `~/.config/byobu/`.
-3. Symlinks `claude/{inside-emacs.md,hooks/inside-emacs-context}` → `~/.claude/`
-   and registers that `SessionStart` hook in `~/.claude/settings.json` (a
-   defensive, idempotent JSON merge — leaves the file untouched if already
-   present or on any parse error), so Claude run from the byobu terminal is told
-   it's inside Emacs (`$EDITOR=emacsclient`, `C-t` navigation, `e`/`open`, …).
+3. Symlinks `leticode/inside-emacs.md` → `~/.letibot/notes/`, and appends the
+   `e*` rules to `~/.config/letibot/permission.json` (a defensive, idempotent
+   JSON merge — it only ever ADDS a missing rule, keeps the file pretty-printed,
+   and leaves it untouched on any parse error), so the assistant run from the
+   byobu terminal is told it's inside Emacs (`$EDITOR=emacsclient`, `C-t`
+   navigation, `e`/`open`, …) and may run the bridge without a prompt.
 
-So shell + byobu + the Claude overlay are edited **in this repo**; the
-source-block, symlinks, and hook registration keep the live system in sync.
-`~/.bashrc` itself stays stock Debian + machine `PATH`s + that one managed block.
+So shell + byobu + the assistant overlay are edited **in this repo**; the
+source-blocks, symlinks, and rules keep the live system in sync.  The rc files
+themselves stay stock (distro defaults + machine `PATH`s) + that one managed block
+each.
 
 ## Development workflow
 
@@ -61,7 +66,8 @@ New features go on a clean branch on top of trunk (`master`):
   `init.el` + `after-init-hook` with `debug-on-error` (this is what catches a bad
   `:custom` key, a typo'd hook, a package that vanished from MELPA — `check-parens`
   catches an unbalanced paren and *nothing else*), then `bash -n` + `shellcheck`
-  over every vendored script. Run it before every commit.
+  over the bash half and `zsh -n` over the zsh half (ShellCheck is bash-only). Run
+  it before every commit.
   - The headless load is only **safe** because every side-effecting startup/exit
     hook is guarded with `noninteractive`: the installer
     (`my-ensure-shell-integration`), the session snapshot (`my-restart--save-state`
@@ -78,16 +84,17 @@ New features go on a clean branch on top of trunk (`master`):
 - **Apply live; don't force restarts.** An Emacs server runs (`server-start`).
   Prefer `emacsclient -e` (or loading a temp lexical-binding `.el`) over asking the
   user to restart. Native modules (ghostel) are the exception — they need a restart.
-- **Shell/byobu edits** go in `shell/integration.bash` / `byobu/*`, never inline
-  in `~/.bashrc`.
+- **Shell/byobu edits** go in the vendored integration (`shell/integration.bash`,
+  `shell/integration.zsh`) or `byobu/*`, never inline in `~/.bashrc` / `~/.zshrc`.
+  A change to one shell's file must be mirrored in the other's.
 
 ## Terminal model (context for changes)
 
 - **ghostel** is an in-Emacs libghostty terminal (the vterm replacement). Per
   project it runs `bb`, attaching a persistent **byobu/tmux** session
-  `projectile/<name>` with tabs `claude/shell/git/test`.
+  `projectile/<name>` with tabs `leticode/shell/git/test`.
 - **`C-t` is a prefix map** (`my-ghostel-prefix-map`, bound in the global map and
-  `ghostel-mode-map`): `C-t C-c` claude, `C-t C-g` git, `C-t C-s` shell, and
+  `ghostel-mode-map`): `C-t C-c` leticode, `C-t C-g` git, `C-t C-s` shell, and
   `C-t C-t` toggles between your code and this project's terminal — from the
   terminal it returns to the *exact* buffer you jumped from (`my-ghostel-toggle-
   terminal`). `C-t` is listed in `ghostel-keymap-exceptions` so it reaches Emacs

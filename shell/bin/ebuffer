@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Print a file PATH whose contents are the buffer Claude should look at -- so the
-# content is fetched (Claude Reads the path), never pasted.  A saved+unmodified
+# Print a file PATH whose contents are the buffer leticode should look at -- so the
+# content is fetched (leticode Reads the path), never pasted.  A saved+unmodified
 # file buffer yields its own path; an unsaved or non-file buffer (scratch, REPL,
-# output) is snapshotted to /tmp first, so Claude sees exactly what you see.
+# output) is snapshotted to /tmp first, so leticode sees exactly what you see.
 #
 #   ebuffer        the buffer you last toggled from  ("this / that / the buffer")
 #   ebuffer NAME   a specific buffer by name
 #
 # To *pick* a buffer from a list, the user runs `C-t C-b' in Emacs (native picker;
 # it sends the reference here) -- there is intentionally no remote selector.
-# Allowlist: Bash(ebuffer:*)
+# Pre-approved by the `ebuffer*` rule in ~/.config/letibot/permission.json.
 set -euo pipefail
 case "${1:-}" in
     "") ref="(my-ebuffer-ref)" ;;

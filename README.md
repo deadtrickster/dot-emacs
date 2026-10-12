@@ -7,7 +7,7 @@ the same setup runs on any machine.
 
 ## Per-project terminals
 
-Each project has a persistent terminal session with tabs (default: `claude`,
+Each project has a persistent terminal session with tabs (default: `leticode`,
 `shell`, `git`, `test`). You can add named tabs and close them, and the tab
 layout is saved per project — a project comes back with the tabs you left it
 with. The session runs independently of the editor — closing the editor leaves
@@ -44,7 +44,7 @@ terminal. The views are throwaway — the session itself is never affected.
 | Key | Action |
 |---|---|
 | `C-t C-t` | Toggle between the code buffer and this project's terminal. |
-| `C-t C-c` / `C-t C-g` / `C-t C-s` | Go to the `claude` / `git` / `shell` tab. |
+| `C-t C-c` / `C-t C-g` / `C-t C-s` | Go to the `leticode` / `git` / `shell` tab. |
 | `C-t` then a letter | Go to the tab starting with that letter (directly if unique, otherwise a filtered list). |
 | `C-t C-n` | Create a tab (prompts for a name). |
 | `C-t C-k` | Close a tab (defaults to the current one, confirms first). |
@@ -95,7 +95,7 @@ terminals — and restores the same state in place.
 
 ## AI assistant
 
-When the Claude CLI runs in a project terminal, it is told it is inside the
+When leticode runs in a project terminal, it is told it is inside the
 editor, and integrates both ways:
 
 - **You point it at things.** Cite the selected region (`C-t C-y`) or a whole
