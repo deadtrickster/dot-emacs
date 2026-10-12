@@ -11,6 +11,7 @@ up the rest.
 |---|---|
 | `early-init.el` | Pre-package init. **Only** MELPA registration — must live here (runs before `package-initialize`). |
 | `init.el` | The entire Emacs config, `use-package`-based throughout. |
+| `letibot-gray-theme.el` | The theme.  Every face is a reference to a SLOT of the Ghostty `LetibotGray` palette (`ghostty +show-config` is the source of truth, never a screenshot), so the GUI frame and the terminal beside it are one surface; enabled through `custom-enabled-themes`.  Colour belongs here, not in `init.el`. |
 | `shell/integration.bash` / `shell/integration.zsh` | Vendored shell integration: `bb`/`bb-reset`, ghostel/`emacsclient` helpers, direnv hook, git-prompt. One file per shell, sourced by `~/.bashrc` / `~/.zshrc` — ghostel spawns `$SHELL`, which is bash on the Linux box and zsh on a Mac, so **keep the two in sync**. |
 | `shell/bin/*` | Vendored standalone helper scripts symlinked onto PATH (`~/.local/bin`) by the installer so the assistant's non-interactive shell can run them: the `e*` Emacs bridge (`eopen`, `esay`, `enotify`, `ecommit`, `ebuffer`, `esh`, `etab`, `etty`, `ediff-review`) + the `oriole-*` formatters. |
 | `byobu/{status,.tmux.conf,bin/bb-save-layout}` | Vendored byobu config; symlinked into `~/.config/byobu/`. |
@@ -62,7 +63,8 @@ New features go on a clean branch on top of trunk (`master`):
   never writes a tracked file. The bootstrap (require package, install
   use-package) and `early-init.el` are the only non-`use-package` top-level code.
 - **Verify before trusting — run `./bin/check`.** It is the whole test suite:
-  `check-parens` on both elisp files, a **full headless load** of `early-init.el` +
+  `check-parens` on every elisp file (`early-init.el`, `init.el`,
+  `letibot-gray-theme.el`), a **full headless load** of `early-init.el` +
   `init.el` + `after-init-hook` with `debug-on-error` (this is what catches a bad
   `:custom` key, a typo'd hook, a package that vanished from MELPA — `check-parens`
   catches an unbalanced paren and *nothing else*), then `bash -n` + `shellcheck`

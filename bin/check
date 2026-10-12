@@ -27,7 +27,7 @@ bad() {
 }
 
 step "elisp: parens"
-for f in early-init.el init.el; do
+for f in early-init.el init.el letibot-gray-theme.el; do
     # emacs-lisp-mode matters: in fundamental-mode check-parens miscounts parens
     # inside comments and strings, and false-fails on this file.
     if emacs -Q --batch --eval "(with-temp-buffer

@@ -139,24 +139,15 @@ holds whatever it held before."
   (setq-default sgml-basic-offset 4      ; html / sgml / mhtml
                 nxml-child-indent 4      ; xml
                 nxml-attribute-indent 4)
-  ;; deeper-blue is enabled via `custom-enabled-themes' during init, and a theme
-  ;; clobbers face overrides applied before it (so `:custom-face' here lost).
-  ;; Re-apply our mode-line tweaks after startup and on any theme (re-)enable.
-  (defun my-tune-mode-line-faces (&rest _)
-    "Calm the mode-line over deeper-blue: dark slate bar, white buffer name,
-dimmed envrc `none' (inactive windows dimmer than active)."
-    (set-face-attribute 'mode-line nil :background "#2a2f3d" :foreground "#a9b1c2")
-    (when (facep 'mode-line-active)
-      (set-face-attribute 'mode-line-active nil :background "#2a2f3d" :foreground "#a9b1c2"))
-    (set-face-attribute 'mode-line-inactive nil :background "#1e212b" :foreground "#5e6573")
-    ;; buffer name: same foreground as the byobu active window name (was blue4)
-    (set-face-attribute 'mode-line-buffer-id nil :foreground "#e3e7ee" :weight 'bold)
-    ;; envrc "none": drop the bright `warning' yellow inheritance
-    (when (facep 'envrc-mode-line-none-face)
-      (set-face-attribute 'envrc-mode-line-none-face nil :inherit nil
-                          :foreground "#75808f" :weight 'normal)))
-  (add-hook 'emacs-startup-hook #'my-tune-mode-line-faces)
-  (add-hook 'enable-theme-functions #'my-tune-mode-line-faces)
+  ;; The mode line is not tuned from here any more.  It used to be: a theme
+  ;; clobbers face overrides applied before it, so any `:custom-face' for the bar
+  ;; lost, and this function re-applied a slate one after startup and on every
+  ;; theme enable.  The cure is upstream of the symptom -- the mode line is
+  ;; DEFINED BY the theme now (`letibot-gray-theme.el', over the terminal's own
+  ;; palette), so there is nothing to re-apply and nothing to fight: the bar is
+  ;; the palette's slot 0, the buffer name its brightest slot, the inactive bar
+  ;; the background nudged toward slot 0, and envrc's "none" reads as `faint'
+  ;; instead of inheriting a bright `warning' yellow.
   ;; C-t is a prefix map (set up in the `projectile' block): C-t C-t = byobu
   ;; terminal, C-t C-c = leticode.  Each toggles, so the same chord returns you.
   (global-set-key (kbd "<home>") 'beginning-of-line)
@@ -314,7 +305,11 @@ retro-fixes one that streamed in uncolored."
 (use-package cus-edit
   :ensure nil
   :custom
-  (custom-enabled-themes '(deeper-blue)))
+  ;; The theme is this repo's own `letibot-gray-theme.el': the Ghostty palette,
+  ;; so the GUI frame and the terminal it sits beside are one surface (the
+  ;; font, Hack, comes from there too).  It was the built-in `deeper-blue',
+  ;; whose palette had nothing to do with the terminal's.
+  (custom-enabled-themes '(letibot-gray)))
 
 (use-package dired
   :ensure nil
@@ -782,65 +777,31 @@ each time.  So the listing draws immediately and the column lands a moment later
   :custom
   (web-mode-markup-indent-offset 2))
 
-(use-package faces
-  :ensure nil
-  :custom-face
-  (default ((t (:inherit nil :extend nil :stipple nil :background "#181a26"
-                        :foreground "gray80" :inverse-video nil :box nil
-                        :strike-through nil :overline nil :underline nil
-                        :slant normal :weight regular :height 95 :width normal
-                        :foundry "GOOG" :family "Roboto Mono"))))
-  ;; Lucid-toolkit scrollbar takes its colour from this face; unspecified, it
-  ;; renders bright.  Match the background, muted thumb (readable on KDE).
-  (scroll-bar ((t (:background "#181a26" :foreground "#3a3f52"))))
-  (compilation-error ((t (:foreground "#D9786B"))))
-  (compilation-info ((t (:foreground "#A3A9CE" :weight normal))))
-  (compilation-warning ((t (:inherit warning :foreground "#FDB262"))))
-  (custom-button ((t (:background "#606163" :foreground "#e8e9e9"
-                                  :box (:line-width (2 . 2) :style flat-button)))))
-  (eglot-highlight-symbol-face ((t (:distant-foreground "orange" :foreground "black"
-                                           :weight ultra-heavy))))
-  (flycheck-error ((t (:background "#553333" :underline (:color "Red1" :style wave)))))
-  (fringe ((t (:background "#181a26"))))
-  (highlight ((t (:underline t))))
-  (hl-line ((t (:background "#2b2d36"))))
-  (line-number ((t (:inherit (shadow default) :foreground "gray34" :height 95))))
-  (line-number-current-line ((t (:inherit line-number :foreground "gray60"))))
-  (link ((t (:slant italic))))
-  (mode-line ((t (:background "#282b35" :foreground "#737475"
-                              :box (:line-width (1 . 1) :style flat-button)))))
-  (mode-line-buffer-id ((t (:distant-foreground "#969696" :foreground "gray75"
-                                                :weight bold))))
-  (mode-line-inactive ((t (:background "#282b35" :foreground "#737475"
-                                       :box (:line-width (1 . 1) :color "#121214"
-                                             :style flat-button)))))
-  (parenthesis ((t (:inherit default :foreground "dim gray"))))
-  (show-paren-match ((t (:background "#2f334b"))))
-  (term-color-black ((t (:background "#555753" :foreground "black"))))
-  (term-color-blue ((t (:background "#739FCF" :foreground "#3465A4"))))
-  (term-color-cyan ((t (:background "#34E2E2" :foreground "#06989A"))))
-  (term-color-green ((t (:background "#8AE234" :foreground "#4E9A06"))))
-  (term-color-magenta ((t (:background "#AD7FA8" :foreground "#75507B"))))
-  (term-color-red ((t (:background "#EF2929" :foreground "#CC0000"))))
-  (term-color-white ((t (:background "#EEEEEC" :foreground "#D3D7CF"))))
-  (term-color-yellow ((t (:background "#FCE94F" :foreground "#C4A000"))))
-  (tooltip ((t (:inherit default :height 1.0))))
-  (widget-field ((t (:extend t :background "#171A27"
-                             :box (:line-width (1 . 3) :color "#737687"
-                                   :style flat-button) :weight bold :height 1.0)))))
+;; The faces that used to be listed here -- the palette-bearing ones: `default',
+;; the mode line, fringe, hl-line, line numbers, `term-color-*' and
+;; `ansi-color-*', compilation, dired, org -- now live in the THEME, which is
+;; where a palette belongs: `letibot-gray-theme.el', the palette Ghostty already
+;; resolves for this machine, with one palette-slot reference per face.  Nothing
+;; colour-related is left in this file; what stays here is structure and sizing
+;; (see the darwin block below for the frame's size).
 
-;; macOS: the `default' and `line-number' faces above carry an ABSOLUTE size, and
-;; that is what `:height 95' means in a face spec — tenths of a point, NOT a
-;; percentage (only a float is relative).  9.5pt reads considerably smaller on a
-;; Retina screen than the same nominal size did on X11, and smaller than the 12pt
-;; Menlo the NS port falls back to — which is what this config looked like here
-;; before this block existed: it "worked", because the requested family was not
-;; installed either, so the frame fell back to Menlo 12 and nothing said so.
-;; Raise just those two; every other face in the block above is `:height 1.0' and
-;; follows.  Tune to taste — this is points x10, so 120 = 12pt.
+;; macOS sizing.  `:height 95' is ABSOLUTE -- tenths of a point, not a percentage
+;; (only a float is relative) -- so the theme asks for 9.5pt.  That is a dense size
+;; that reads much smaller on a Retina screen, and it is not what the terminal next
+;; door uses: Ghostty renders Hack at 13pt (`font-size = 13' in its resolved
+;; config), so the frame is set to match it.  9.5pt only appeared to "work" before
+;; because the requested family was missing entirely and the frame fell back to
+;; Menlo 12 -- a font and size the config never asked for, and nothing warned.
+;; Linux keeps the theme's own 9.5pt.  Tune to taste: points x10, so 130 = 13pt.
+;;
+;; And the text was heavier than the terminal's beside it even at the same font and
+;; size, which is not Hack's fault: Emacs draws macOS text with THICK strokes by
+;; default (`ns-use-thin-smoothing' is nil), while AppKit apps -- Ghostty among
+;; them -- take the thin stroke / font-smoothing path.  This is that path.
 (when (eq system-type 'darwin)
   (dolist (face '(default line-number))
-    (set-face-attribute face nil :height 120)))
+    (set-face-attribute face nil :height 130))
+  (setq ns-use-thin-smoothing t))
 
 ;; ---------------------------------------------------------------------------
 ;; Terminal (tty) frames — `etty' / `emacsclient -nw', typically over ssh.
