@@ -794,17 +794,35 @@ each time.  So the listing draws immediately and the column lands a moment later
 ;; Menlo 12 -- a font and size the config never asked for, and nothing warned.
 ;; Linux keeps the theme's own 9.5pt.  Tune to taste: points x10, so 130 = 13pt.
 ;;
-;; NB: do NOT reach for `ns-use-thin-smoothing' for macOS text weight.  Its own
-;; docstring promises "thinner strokes", but in 31.1 the variable is NEVER READ:
-;; the C identifier occurs only in the DEFVAR that defines it (checked in
-;; src/nsterm.m and src/nsfont.m), so setting it cannot change anything.
-;; Text weight on macOS belongs to CoreText, and the lever is an app default --
-;; `defaults write org.gnu.Emacs CGFontRenderingFontSmoothingDisabled -bool true'
-;; -- which is read at LAUNCH, hence the restart.  Machine state, not config,
-;; so it is not set from here.
+;;
+;; The FAMILY is pinned here too, not just left to the theme: a running Emacs was
+;; found drawing JetBrains Mono -- set by hand at some point, outliving the theme's
+;; `:family "Hack"' exactly as a hand-set attribute does -- and JetBrains Mono is
+;; installed as a variable font (`JetBrainsMono[wght].ttf'), which the NS port
+;; tends to render at a heavier instance.  Hack is four static files, like
+;; Ghostty's.  `default-frame-alist' makes a NEW frame (C-x 5 2) Hack 13 as well.
+;;
+;; "Everything is bold": CoreText's font smoothing on macOS >= 10.14 is stem
+;; darkening -- every glyph is dilated.  Ghostty turns it off (`font-thicken =
+;; false' is its default); Emacs leaves it on, so the same Hack 13 looks bold
+;; beside the terminal.  The lever is the per-app default `AppleFontSmoothing = 0'
+;; (`CGFontRenderingFontSmoothingDisabled' is the pre-Mojave key and does nothing
+;; now; `ns-use-thin-smoothing' is never read in 31.1 -- only its DEFVAR exists in
+;; src/nsterm.m and src/nsfont.m).  It is read at LAUNCH, so it is written here
+;; once, idempotently, and takes effect on the next start.  Guarded by
+;; `noninteractive' so `bin/check' never touches the machine.
 (when (eq system-type 'darwin)
+  (set-face-attribute 'default nil :family "Hack" :weight 'regular)
   (dolist (face '(default line-number))
-    (set-face-attribute face nil :height 130)))
+    (set-face-attribute face nil :height 130))
+  (add-to-list 'default-frame-alist '(font . "Hack-13"))
+  (unless (or noninteractive
+              (equal (string-trim
+                      (shell-command-to-string
+                       "defaults read org.gnu.Emacs AppleFontSmoothing 2>/dev/null"))
+                     "0"))
+    (call-process "defaults" nil nil nil
+                  "write" "org.gnu.Emacs" "AppleFontSmoothing" "-int" "0")))
 
 ;; ---------------------------------------------------------------------------
 ;; Terminal (tty) frames — `etty' / `emacsclient -nw', typically over ssh.
