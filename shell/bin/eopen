@@ -5,6 +5,23 @@
 # clashes with /usr/bin/open.  Vendored here; symlinked onto PATH (~/.local/bin)
 # by `my-ensure-shell-integration'.  Allowlist in Claude with: Bash(eopen:*)
 set -euo pipefail
+
+# Resolve to an absolute path.  `realpath -m' is GNU coreutils; macOS ships BSD
+# /bin/realpath, which rejects BOTH `-m' and `--' -- so this line used to die with
+# "illegal option" before emacsclient ever ran, and `e', `open' and Claude's
+# `eopen' silently did nothing on a Mac.  Probe once, then fall back to chdir'ing
+# into the PARENT and printing $PWD: for the paths we are handed (existing files,
+# or a new one whose directory exists) that is the same answer, and `-m' semantics
+# survive because only the parent is ever walked.  Kept in-file rather than shared:
+# these helpers are standalone by design (they run from a non-interactive shell).
+mypath() {
+    if realpath -m / >/dev/null 2>&1; then
+        realpath -m -- "$1"
+    else
+        printf '%s/%s' "$(cd -- "$(dirname -- "$1")" && pwd)" "$(basename -- "$1")"
+    fi
+}
+
 args=()
-for f in "${@:-.}"; do args+=("$(realpath -m -- "$f")"); done
+for f in "${@:-.}"; do args+=("$(mypath "$f")"); done
 exec emacsclient -n -- "${args[@]}"

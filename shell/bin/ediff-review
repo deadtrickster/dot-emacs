@@ -19,8 +19,20 @@ set -euo pipefail
 
 target="${1:?usage: ediff-review <target> <proposed>}"
 proposed="${2:?usage: ediff-review <target> <proposed>}"
-target=$(realpath -m -- "$target")
-proposed=$(realpath -m -- "$proposed")
+# `realpath -m' is GNU coreutils; macOS's BSD /bin/realpath takes neither `-m' nor
+# `--', so the whole review aborted with "illegal option" on a Mac.  Fall back to
+# chdir'ing into the parent and printing $PWD (same answer, and the file itself
+# need not exist -- only the parent is walked).  Duplicated from `eopen' rather
+# than shared: both are standalone by design.
+mypath() {
+    if realpath -m / >/dev/null 2>&1; then
+        realpath -m -- "$1"
+    else
+        printf '%s/%s' "$(cd -- "$(dirname -- "$1")" && pwd)" "$(basename -- "$1")"
+    fi
+}
+target=$(mypath "$target")
+proposed=$(mypath "$proposed")
 
 [ -f "$target" ] || {
     echo "ediff-review: target does not exist: $target" >&2
