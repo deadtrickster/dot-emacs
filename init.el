@@ -812,9 +812,10 @@ each time.  So the listing draws immediately and the column lands a moment later
 ;; The FAMILY is pinned here too, not just left to the theme: a running Emacs was
 ;; found drawing JetBrains Mono -- set by hand at some point, outliving the theme's
 ;; `:family "Hack"' exactly as a hand-set attribute does -- and JetBrains Mono is
-;; installed as a variable font (`JetBrainsMono[wght].ttf'), which the NS port
-;; tends to render at a heavier instance.  Hack is four static files, like
-;; Ghostty's.  `default-frame-alist' makes a NEW frame (C-x 5 2) Hack 13 as well.
+;; a VARIABLE font (`JetBrainsMono[wght].ttf', since uninstalled from this
+;; machine), which the NS port tends to render at a heavier instance.  Hack is
+;; four static files, like Ghostty's.  `default-frame-alist' makes a NEW frame
+;; (C-x 5 2) Hack 13 as well.
 ;;
 ;; "Everything is bold": CoreText's font smoothing on macOS >= 10.14 is stem
 ;; darkening -- every glyph is dilated.  Ghostty turns it off (`font-thicken =
