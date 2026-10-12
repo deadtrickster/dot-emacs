@@ -829,6 +829,19 @@ each time.  So the listing draws immediately and the column lands a moment later
                              :box (:line-width (1 . 3) :color "#737687"
                                    :style flat-button) :weight bold :height 1.0)))))
 
+;; macOS: the `default' and `line-number' faces above carry an ABSOLUTE size, and
+;; that is what `:height 95' means in a face spec — tenths of a point, NOT a
+;; percentage (only a float is relative).  9.5pt reads considerably smaller on a
+;; Retina screen than the same nominal size did on X11, and smaller than the 12pt
+;; Menlo the NS port falls back to — which is what this config looked like here
+;; before this block existed: it "worked", because the requested family was not
+;; installed either, so the frame fell back to Menlo 12 and nothing said so.
+;; Raise just those two; every other face in the block above is `:height 1.0' and
+;; follows.  Tune to taste — this is points x10, so 120 = 12pt.
+(when (eq system-type 'darwin)
+  (dolist (face '(default line-number))
+    (set-face-attribute face nil :height 120)))
+
 ;; ---------------------------------------------------------------------------
 ;; Terminal (tty) frames — `etty' / `emacsclient -nw', typically over ssh.
 ;; ---------------------------------------------------------------------------
