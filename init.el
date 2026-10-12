@@ -897,11 +897,25 @@ each time.  So the listing draws immediately and the column lands a moment later
   ;; exactly that line).
   (ring-bell-function
    (lambda ()
-     (when (display-graphic-p)
+     (cond
+      ;; On macOS the NS port's `visible-bell' is a huge yellow warning
+      ;; triangle drawn in the MIDDLE of the frame -- and terminals ring often
+      ;; (a byobu tab's activity/bell alert fires as you switch to it), so it
+      ;; read as a mystery triangle over the assistant's window.  Blink the
+      ;; selected window's mode line instead: a bell, not an alarm.
+      ((and (display-graphic-p) (eq system-type 'darwin))
+       (unless (get 'mode-line-active 'my-bell-flashing)
+         (put 'mode-line-active 'my-bell-flashing t)
+         (invert-face 'mode-line-active)
+         (run-at-time 0.12 nil
+                      (lambda ()
+                        (invert-face 'mode-line-active)
+                        (put 'mode-line-active 'my-bell-flashing nil)))))
+      ((display-graphic-p)
        ;; Rebinding to nil is what lets us invoke the REAL bell without
        ;; re-entering this function.
        (let ((ring-bell-function nil))
-         (ding t)))))
+         (ding t))))))
 
   :custom-face
   ;; --- tty menus ---
