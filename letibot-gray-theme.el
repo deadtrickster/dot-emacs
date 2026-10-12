@@ -141,30 +141,42 @@
    ;; Emacs's ANSI faces ARE the terminal's palette, so a `git log --color' rendered
    ;; in a ghostel buffer, in a compilation buffer or by rg is the same green as the
    ;; same command in Ghostty.
-   `(ansi-color-black ((t (:background ,raised :foreground ,bg))))
-   `(ansi-color-red ((t (:background ,red :foreground ,bg))))
-   `(ansi-color-green ((t (:background ,green :foreground ,bg))))
-   `(ansi-color-yellow ((t (:background ,yellow :foreground ,bg))))
-   `(ansi-color-blue ((t (:background ,blue :foreground ,bg))))
-   `(ansi-color-magenta ((t (:background ,magenta :foreground ,bg))))
-   `(ansi-color-cyan ((t (:background ,cyan :foreground ,bg))))
-   `(ansi-color-white ((t (:background ,white :foreground ,bg))))
-   `(ansi-color-bright-black ((t (:background ,faint :foreground ,bg))))
-   `(ansi-color-bright-red ((t (:background ,hi-red :foreground ,bg))))
-   `(ansi-color-bright-green ((t (:background ,hi-green :foreground ,bg))))
-   `(ansi-color-bright-yellow ((t (:background ,hi-yellow :foreground ,bg))))
-   `(ansi-color-bright-blue ((t (:background ,hi-blue :foreground ,bg))))
-   `(ansi-color-bright-magenta ((t (:background ,hi-magenta :foreground ,bg))))
-   `(ansi-color-bright-cyan ((t (:background ,hi-cyan :foreground ,bg))))
-   `(ansi-color-bright-white ((t (:background ,bright :foreground ,bg))))
-   `(term-color-black ((t (:background ,raised :foreground ,raised))))
-   `(term-color-red ((t (:background ,red :foreground ,red))))
-   `(term-color-green ((t (:background ,green :foreground ,green))))
-   `(term-color-yellow ((t (:background ,yellow :foreground ,yellow))))
-   `(term-color-blue ((t (:background ,blue :foreground ,blue))))
-   `(term-color-magenta ((t (:background ,magenta :foreground ,magenta))))
-   `(term-color-cyan ((t (:background ,cyan :foreground ,cyan))))
-   `(term-color-white ((t (:background ,white :foreground ,white))))
+   ;; ANSI faces: `:foreground' is the slot's colour -- what `ansi-color-apply'
+   ;; paints text with, and what ghostel reads as its palette (see the config's
+   ;; ghostel block).  FOREGROUND ONLY, deliberately: a background here paints a
+   ;; coloured box behind every coloured token, and a foreground set to the
+   ;; BACKGROUND colour -- or a background set equal to the foreground -- makes
+   ;; text vanish.  Measured the hard way: with both set to the same value, a
+   ;; prompt drawn in slot 15 came out white on white inside Emacs while Ghostty,
+   ;; which never sees these faces, showed it fine.
+   `(ansi-color-black ((t (:foreground ,raised))))
+   `(ansi-color-red ((t (:foreground ,red))))
+   `(ansi-color-green ((t (:foreground ,green))))
+   `(ansi-color-yellow ((t (:foreground ,yellow))))
+   `(ansi-color-blue ((t (:foreground ,blue))))
+   `(ansi-color-magenta ((t (:foreground ,magenta))))
+   `(ansi-color-cyan ((t (:foreground ,cyan))))
+   `(ansi-color-white ((t (:foreground ,white))))
+   `(ansi-color-bright-black ((t (:foreground ,faint))))
+   `(ansi-color-bright-red ((t (:foreground ,hi-red))))
+   `(ansi-color-bright-green ((t (:foreground ,hi-green))))
+   `(ansi-color-bright-yellow ((t (:foreground ,hi-yellow))))
+   `(ansi-color-bright-blue ((t (:foreground ,hi-blue))))
+   `(ansi-color-bright-magenta ((t (:foreground ,hi-magenta))))
+   `(ansi-color-bright-cyan ((t (:foreground ,hi-cyan))))
+   `(ansi-color-bright-white ((t (:foreground ,bright))))
+   ;; `term-color-*' keeps the config's own convention: foreground = the normal
+   ;; slot, background = its BRIGHT pair (slots 0-7 and 8-15 are one palette at two
+   ;; intensities), so a face used WITH a background is still readable.  Never the
+   ;; same colour twice -- that is how the prompt disappeared.
+   `(term-color-black ((t (:foreground ,raised :background ,faint))))
+   `(term-color-red ((t (:foreground ,red :background ,hi-red))))
+   `(term-color-green ((t (:foreground ,green :background ,hi-green))))
+   `(term-color-yellow ((t (:foreground ,yellow :background ,hi-yellow))))
+   `(term-color-blue ((t (:foreground ,blue :background ,hi-blue))))
+   `(term-color-magenta ((t (:foreground ,magenta :background ,hi-magenta))))
+   `(term-color-cyan ((t (:foreground ,cyan :background ,hi-cyan))))
+   `(term-color-white ((t (:foreground ,white :background ,bright))))
 
    ;; --- code: the roles rano names, on the slots it names them on -----------
    `(font-lock-comment-face ((t (:foreground ,faint :slant italic))))
