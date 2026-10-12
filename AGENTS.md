@@ -36,6 +36,13 @@ Do **not** commit generated files. The hand-maintained set above is all there is
    and leaves it untouched on any parse error), so the assistant run from the
    byobu terminal is told it's inside Emacs (`$EDITOR=emacsclient`, `C-t`
    navigation, `e`/`open`, …) and may run the bridge without a prompt.
+4. `my-ensure-fonts`: warns when the family the theme's `default` face names is
+   not installed (Emacs cannot install a cask/deb font, and the silent failure is
+   a frame rendering in a substitute — on macOS, Menlo at the wrong size), and
+   fetches the `all-the-icons` fonts when they are missing (plain downloads; the
+   dashboard and dired icons are drawn with them).  Both guarded by
+   `noninteractive`, which matters: `bin/check` loads this config AND runs
+   `after-init-hook`, and must neither reach the network nor need a frame.
 
 So shell + byobu + the assistant overlay are edited **in this repo**; the
 source-blocks, symlinks, and rules keep the live system in sync.  The rc files

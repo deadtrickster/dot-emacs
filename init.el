@@ -836,6 +836,54 @@ each time.  So the listing draws immediately and the column lands a moment later
     (call-process "defaults" nil nil nil
                   "write" "org.gnu.Emacs" "AppleFontSmoothing" "-int" "0")))
 
+;; A face naming a family that is not installed falls back SILENTLY: the frame
+;; renders in whatever the backend substitutes -- on macOS, Menlo -- and nothing
+;; says so.  That is how this config sat in the wrong font, at the wrong size, for
+;; as long as nobody looked closely.  So check what is checkable at startup:
+;;
+;;   * the TEXT family the theme names.  Emacs cannot install it (it arrives as a
+;;     homebrew cask or a distro package), so say it out loud: a warning naming
+;;     the family, the file that names it, and the command per platform.  The name
+;;     is a constant here on purpose -- `(face-attribute 'default :family)' answers
+;;     with the SUBSTITUTE it fell back to (Menlo), which is the very condition we
+;;     are trying to detect.
+;;   * the ICON fonts (`all-the-icons', drawn by the dashboard, dired and the mode
+;;     line).  Those are plain TTF downloads the package knows how to fetch, so
+;;     fetch them when absent -- once per machine, and never in batch.
+;;
+;; `noninteractive' matters twice over: ./bin/check LOADS this config and runs
+;; `after-init-hook', and it must neither reach the network nor need a frame.
+(defun my-ensure-theme-font ()
+  "Warn when the family the theme names is not installed."
+  (when (and (display-graphic-p)
+             (not (find-font (font-spec :family "Hack"))))
+    (display-warning
+     'my-fonts
+     (concat "Hack is not installed, so every frame is rendering in a"
+             " substitute (macOS: brew install --cask font-hack;"
+             " Debian: apt install fonts-hack).  The theme's default face names"
+             " it in letibot-gray-theme.el.")
+     :warning)))
+
+(defun my-ensure-icon-fonts ()
+  "Fetch the `all-the-icons' fonts when they are missing."
+  (when (and (display-graphic-p)
+             (require 'all-the-icons nil t)
+             (fboundp 'all-the-icons-install-fonts)
+             (not (find-font (font-spec :family "all-the-icons"))))
+    (condition-case err
+        (all-the-icons-install-fonts t)
+      (error (display-warning
+              'my-fonts
+              (format (concat "could not install the all-the-icons fonts (%S);"
+                              " the dashboard and dired icons will be blank")
+                      err)
+              :warning)))))
+
+(unless noninteractive
+  (add-hook 'after-init-hook #'my-ensure-theme-font)
+  (add-hook 'after-init-hook #'my-ensure-icon-fonts))
+
 ;; ---------------------------------------------------------------------------
 ;; Terminal (tty) frames — `etty' / `emacsclient -nw', typically over ssh.
 ;; ---------------------------------------------------------------------------
@@ -1990,29 +2038,77 @@ remembering this buffer to come back to."
                        (if buf (my-ghostel--enter-from buf src) (my-project-tab nil))))
               (t     (my-project-tab nil))))))               ; prompt (open projects first)
 
-  (defun my-ghostel-open-referenced-file ()
-    "Open a file leticode referenced in the visible terminal.
-Scans the visible region for tool forms -- `Write(path)' / `Edit(path)' /
-`Read(path)' / `Update(path)' etc. -- and opens the one you pick (or the only
-one) in the other window, resolved against the terminal's directory.  A robust
-stand-in for clicking, since the TUI owns the mouse.  Bound to `C-t C-f'.
+  (defun my-ghostel--refs-in-region ()
+    "Every file reference ghostel itself has detected in the visible region.
+Each entry is (DISPLAY . ABSOLUTE-PATH); the list is bottom-first (the most
+recent output first, which is what you usually want).
 
-(For `path:line' / `path:line:col' references, ghostel linkifies those itself --
-click or RET on one and it jumps to the line; see `ghostel--open-link'.)"
+Asks GHOSTEL rather than re-parsing the screen.  It already detects paths -- it
+is what makes them clickable -- and it puts a `fileref:' help-echo and a
+`ghostel-link-text' on each, so one walk of `ghostel--find-next-link' collects
+them.  Re-parsing here would be a second detector to keep in step with the first."
+    (let ((end (window-end nil t))
+          (pos (window-start))
+          (out nil))
+      (save-excursion
+        (while (and pos (< pos end))
+          (let* ((at (ghostel--find-next-link pos))
+                 (uri (and at (< at end) (get-text-property at 'help-echo)))
+                 (file (and (stringp uri)
+                            ;; the same shape ghostel's own regex accepts:
+                            ;; fileref:PATH[:LINE[:COL]], the path non-greedy so
+                            ;; a colon inside it is kept.
+                            (string-match
+                             "\\`fileref:\\(.*?\\)\\(?::\\([0-9]+\\)\\(?::\\([0-9]+\\)\\)?\\)?\\'"
+                             uri)
+                            (cons (match-string 1 uri)
+                                  (if (match-string 2 uri)
+                                      (string-to-number (match-string 2 uri)))))))
+            (when file
+              (push (cons (or (get-text-property at 'ghostel-link-text) (car file))
+                          (cons (expand-file-name (car file) default-directory)
+                                (cdr file)))
+                    out))
+          ;; +1 puts point inside the link we just took, so the walk skips its
+          ;; other rows instead of returning the same link again.
+          (setq pos (if at (1+ at) (1+ end)))))
+      out)))
+
+  (defun my-ghostel-open-referenced-file ()
+    "Open a file the assistant referenced in the visible terminal.
+Offers every file GHOSTEL has linkified in the visible region -- the same set
+you can click -- and opens the one you pick (or the only one) in this window,
+at the line the reference named when it named one.  Bound to `C-t C-f'.
+
+It used to scan for Claude Code's raw call forms -- `Write(path)', `Read(path)'
+and friends.  leticode never prints those: its TUI draws a tool call as a
+`┌─ bash' / `│ command' / `└─' block and folds narration into
+`[N thinking lines]', so the scan matched nothing at all.  Going through
+ghostel's own detector is also what the mouse does (see `ghostel-open-link-at-
+click'), so the keyboard and the mouse cannot disagree about what is a link."
     (interactive)
-    (let* ((text (buffer-substring-no-properties (window-start) (window-end nil t)))
-           (re (concat "\\_<\\(?:Write\\|Edit\\|Read\\|Update\\|Create\\|"
-                       "MultiEdit\\|NotebookEdit\\)(\\([^),\n]+\\)"))
-           (paths nil) (pos 0))
-      (while (string-match re text pos)
-        (push (string-trim (match-string 1 text)) paths)
-        (setq pos (match-end 1)))
-      (setq paths (delete-dups paths))   ; most-recent (bottom of screen) first
-      (let ((choice (cond ((null paths) (user-error "No file references on screen"))
-                          ((null (cdr paths)) (car paths))
-                          (t (completing-read "Open referenced file: " paths nil nil)))))
-        ;; open in THIS window (no surprise split); C-t C-t toggles back.
-        (find-file (expand-file-name choice default-directory)))))
+    (let* ((refs (my-ghostel--refs-in-region))
+           ;; one entry per (file . line); the display form is only for the prompt,
+           ;; so dedupe on what we actually open.
+           (entries (delete-dups (mapcar (lambda (r) (cdr r)) refs)))
+           (choice
+            (cond ((null entries) (user-error "No file references on screen"))
+                  ((null (cdr entries)) (car entries))
+                  (t (let ((picked (completing-read
+                                    "Open referenced file: "
+                                    (mapcar (lambda (e) (abbreviate-file-name (car e)))
+                                            entries)
+                                    nil t)))
+                       (or (seq-find (lambda (e)
+                                       (equal (abbreviate-file-name (car e)) picked))
+                                     entries)
+                           (car entries)))))))
+      ;; open in THIS window (no surprise split); C-t C-t toggles back.
+      (find-file (car choice))
+      ;; a `path:LINE' reference lands where a click on it would.
+      (when (cdr choice)
+        (goto-char (point-min))
+        (forward-line (1- (cdr choice))))))
 
   (defun my-ebuffer-ref (&optional which)
     "Return a file path whose contents represent a buffer, for the `ebuffer'
