@@ -44,14 +44,28 @@ step "elisp: full headless load"
 # -Q means Emacs never activates packages (it only does that for a real init), so
 # `package-activate-all' here is what puts elpa/ on the load-path -- without it
 # every :ensure package "cannot load" and the test is worthless.
+#
+# The exit status alone is NOT enough: `use-package' does not signal on a bad
+# keyword, it prints "Error (use-package): PKG/KEYWORD: ERR" and carries on, so
+# the process still exits 0.  A `:custom-face' entry that is not a face is the
+# worked example -- and it is worse than a cosmetic mis-setting, because the error
+# fires mid-expansion and takes the block's whole `:config' down with it (every
+# defun in it, every hook it registers).  So grep the log too.
+loadlog=$(mktemp -t check-load)
+trap 'rm -f "$loadlog"' EXIT
 if emacs -Q --batch --eval '(progn
       (setq debug-on-error t)
       (load (expand-file-name "early-init.el") nil t)
       (package-activate-all)
       (load (expand-file-name "init.el") nil t)
       (run-hooks (quote after-init-hook))
-      (message "loaded clean"))'; then
-    printf '    ok   config loads (early-init + init + after-init-hook)\n'
+      (message "loaded clean"))' >"$loadlog" 2>&1; then
+    if grep -q '^Error (use-package)' "$loadlog"; then
+        bad "use-package swallowed an error (above); the block's :config is dead"
+        grep '^Error (use-package)' "$loadlog" >&2
+    else
+        printf '    ok   config loads (early-init + init + after-init-hook)\n'
+    fi
 else
     bad "config does not load"
 fi
