@@ -903,14 +903,18 @@ each time.  So the listing draws immediately and the column lands a moment later
       ;; (a byobu tab's activity/bell alert fires as you switch to it), so it
       ;; read as a mystery triangle over the assistant's window.  Blink the
       ;; selected window's mode line instead: a bell, not an alarm.
+      ;; `:inverse-video', NOT `invert-face': `mode-line-active' has no colours
+      ;; of its own (it inherits `mode-line'), so `invert-face' wrote the
+      ;; frame's plain fg/bg INTO it and the second call left them there -- the
+      ;; mode line went the colour of the buffer.  Toggling an attribute back to
+      ;; `unspecified' cannot clobber anything.
       ((and (display-graphic-p) (eq system-type 'darwin))
-       (unless (get 'mode-line-active 'my-bell-flashing)
-         (put 'mode-line-active 'my-bell-flashing t)
-         (invert-face 'mode-line-active)
+       (unless (eq (face-attribute 'mode-line-active :inverse-video nil) t)
+         (set-face-attribute 'mode-line-active nil :inverse-video t)
          (run-at-time 0.12 nil
                       (lambda ()
-                        (invert-face 'mode-line-active)
-                        (put 'mode-line-active 'my-bell-flashing nil)))))
+                        (set-face-attribute 'mode-line-active nil
+                                            :inverse-video 'unspecified)))))
       ((display-graphic-p)
        ;; Rebinding to nil is what lets us invoke the REAL bell without
        ;; re-entering this function.
