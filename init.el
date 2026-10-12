@@ -288,11 +288,8 @@ retro-fixes one that streamed in uncolored."
   :ensure nil
   :custom
   (blink-cursor-mode nil)
-  ;; Flash the frame instead of the audible bell (KDE now plays the system beep
-  ;; on every C-g / quit, which the old X setup swallowed).  Graphical frames
-  ;; only -- on a tty the flash is a full-screen repaint, so `ring-bell-function'
-  ;; (in the tty block) gates it on `display-graphic-p'.
-  (visible-bell t)
+  ;; No bell at all -- `ring-bell-function' is `ignore' (see the tty block).
+  (visible-bell nil)
   (delete-selection-mode t)
   (column-number-mode t)
   ;; Show position as `line:column' (e.g. 12:5) instead of the default `(12,5)'.
@@ -878,48 +875,18 @@ each time.  So the listing draws immediately and the column lands a moment later
   (xterm-screen-extra-capabilities '(modifyOtherKeys setSelection))
 
   ;; --- bell ---
-  ;; `visible-bell' (set in the `simple' block) is a good trade on a GUI frame:
-  ;; it replaced the KDE system beep that fires on every `C-g'.  On a tty it is
-  ;; a whole-screen inverse flash — over ssh, a full repaint of every cell, on
-  ;; every quit.  `visible-bell' is not frame-local, so branch in the bell
-  ;; itself: flash on a graphical frame, stay silent on a terminal one.
+  ;; Off, everywhere: no beep, no flash.  Every visible form was worse than none
+  ;; -- the macOS NS `visible-bell' is a huge yellow triangle in the middle of the
+  ;; frame (byobu rings it as you switch to a tab with activity), a mode-line
+  ;; blink is still a flash, and on a tty it is a full-screen repaint.  The
+  ;; operator does not want the bell, so `ignore' it.
   ;;
-  ;; This is a `:custom', not a `:custom-face' — it is a VARIABLE holding a
-  ;; FUNCTION.  It used to sit below, inside `:custom-face', where `face-spec-set'
-  ;; got it as a face spec and signalled `wrong-type-argument listp lambda'.  That
-  ;; error is raised while the block is still expanding its `:custom-face' forms,
-  ;; so it ALSO took this block's `:config' with it: `my-tty-setup' was never
-  ;; defined (so `xterm-mouse-mode' never came on in a tty frame) and the
-  ;; `C-x C-c' rebinding below never happened — both of the things the tty
-  ;; commits claim to do, silently dead in every Emacs.  use-package reports it as
-  ;; "Error (use-package): emacs/:catch: ..." and then CARRIES ON, so nothing
-  ;; failed a test: ./bin/check stayed green (it now greps the load log for
-  ;; exactly that line).
-  (ring-bell-function
-   (lambda ()
-     (cond
-      ;; On macOS the NS port's `visible-bell' is a huge yellow warning
-      ;; triangle drawn in the MIDDLE of the frame -- and terminals ring often
-      ;; (a byobu tab's activity/bell alert fires as you switch to it), so it
-      ;; read as a mystery triangle over the assistant's window.  Blink the
-      ;; selected window's mode line instead: a bell, not an alarm.
-      ;; `:inverse-video', NOT `invert-face': `mode-line-active' has no colours
-      ;; of its own (it inherits `mode-line'), so `invert-face' wrote the
-      ;; frame's plain fg/bg INTO it and the second call left them there -- the
-      ;; mode line went the colour of the buffer.  Toggling an attribute back to
-      ;; `unspecified' cannot clobber anything.
-      ((and (display-graphic-p) (eq system-type 'darwin))
-       (unless (eq (face-attribute 'mode-line-active :inverse-video nil) t)
-         (set-face-attribute 'mode-line-active nil :inverse-video t)
-         (run-at-time 0.12 nil
-                      (lambda ()
-                        (set-face-attribute 'mode-line-active nil
-                                            :inverse-video 'unspecified)))))
-      ((display-graphic-p)
-       ;; Rebinding to nil is what lets us invoke the REAL bell without
-       ;; re-entering this function.
-       (let ((ring-bell-function nil))
-         (ding t))))))
+  ;; This is a `:custom', not a `:custom-face' -- it is a VARIABLE holding a
+  ;; FUNCTION.  It once sat inside `:custom-face', where `face-spec-set' got it
+  ;; as a face spec, signalled, and took this block's `:config' down with it
+  ;; (use-package reports "emacs/:catch" and carries on; ./bin/check now greps
+  ;; the load log for exactly that line).
+  (ring-bell-function #'ignore)
 
   :custom-face
   ;; --- tty menus ---
