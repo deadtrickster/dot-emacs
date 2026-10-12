@@ -53,5 +53,19 @@
 
 ;; Emacs 31+: cache each load-path directory's file list instead of stat-ing the
 ;; whole path on every `load'.  Guarded -- it does not exist in older Emacsen.
+;;
+;; `regexp-opt' MUST be loaded first -- and this is not an optimization, it is
+;; what keeps Emacs from failing to start at all.  The cache function
+;; (startup.el) builds its suffix regex with `regexp-opt', which Emacs 31 no
+;; longer dumps: it moved to emacs-lisp/ and is reachable only through an
+;; autoload.  So with a cold filter, the first `load' after this line -- init.el's
+;; own `(require 'use-package)' -- runs the filter, which calls `regexp-opt',
+;; which LOADS regexp-opt.el, and `load' consults the filter we just installed:
+;; unbounded recursion until "Lisp nesting exceeds `max-lisp-eval-depth'".  Every
+;; startup dies before init.el finishes.  Reproduced on Emacs 31.1 with stock
+;; `emacs -Q --batch' and nothing set but this variable -- an upstream bug (NEWS
+;; 31 advertises the variable for exactly this use), but we are the ones who
+;; switch it on.
 (when (boundp 'load-path-filter-function)
+  (require 'regexp-opt)
   (setq load-path-filter-function #'load-path-filter-cache-directory-files))
